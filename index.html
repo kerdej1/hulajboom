@@ -22,6 +22,7 @@
       </div>
       <div class="akcje">
         <button class="przycisk" data-akcja="profil" title="Zmień swój styl pracy (ile godzin to dzień pracy)">⚙ Mój styl pracy</button>
+        <button class="przycisk" data-akcja="wyczysc" title="Usuń wszystkie zadania, np. żeby przetestować inny plik JSON">Wyczyść</button>
         <button class="przycisk" data-akcja="wczytaj" title="Wczytaj zadania z pliku JSON">Wczytaj JSON</button>
         <button class="przycisk" data-akcja="zapisz" title="Zapisz zadania do pliku JSON">Zapisz JSON</button>
         <button class="przycisk glowny" data-akcja="nowe">+ Nowe zadanie</button>
@@ -140,6 +141,22 @@
   <!-- Styl pracy (pytanie przy pierwszym wejściu) -->
   <dialog id="okno-profil" class="okno okno-profil">
     <div id="profil-tresc" class="profil-tresc"></div>
+  </dialog>
+
+  <!-- Czyszczenie kalendarza -->
+  <dialog id="okno-wyczysc" class="okno">
+    <form id="form-wyczysc" class="szcz">
+      <h2>Wyczyścić kalendarz?</h2>
+      <p class="maly-tekst" style="margin:0">Przydaje się, gdy chcesz zacząć od zera albo przetestować inny plik JSON.
+        Zanim wyczyścisz, możesz zapisać obecne zadania przyciskiem „Zapisz JSON”.</p>
+      <label class="checkbox-wiersz"><input type="checkbox" name="zadania" checked disabled> Wszystkie zadania i odhaczone sesje</label>
+      <label class="checkbox-wiersz"><input type="checkbox" name="wolne"> Dni wykreślone (np. wakacje)</label>
+      <label class="checkbox-wiersz"><input type="checkbox" name="profil"> Mój styl pracy (aplikacja zapyta o niego od nowa)</label>
+      <div class="okno-stopka">
+        <button type="button" class="przycisk" data-akcja="zamknij-wyczysc">Anuluj</button>
+        <button type="submit" class="przycisk usun-przycisk">Wyczyść</button>
+      </div>
+    </form>
   </dialog>
 
   <input type="file" id="plik" accept=".json,application/json" hidden>

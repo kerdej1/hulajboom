@@ -1005,7 +1005,10 @@ function widokTerminarz() {
     : 'Kolor paska = intensywność (zielony luz → fioletowy krytyczne, szary ↻ = okresowe, 🛴 = pojedyncza akcja), !!! / !! / ! = ważność. Kliknij zadanie, aby zobaczyć szczegóły, a kółko – aby je odhaczyć. Dni pracy są w przerywanej ramce. Kliknij puste miejsce w dniu, aby go wykreślić (np. wakacje) – plan się wtedy ściśnie.';
   const bezTerminu = dane.zadania.filter(z => !z.wykonane && !z.termin).length;
 
-  return pasekNarzedzi + naglowkiDni +
+  const pusty = dane.zadania.length ? '' : `<div class="pusto" style="margin-bottom:14px">Kalendarz jest pusty.<br>
+      <button class="przycisk glowny" data-akcja="wczytaj">Wczytaj plik JSON</button>
+      <button class="przycisk" data-akcja="nowe">+ Dodaj zadanie</button></div>`;
+  return pusty + pasekNarzedzi + naglowkiDni +
     `<div class="kal kal-${tryb}">${komorki}</div>
      <p class="maly-tekst tydzien-stopka">${legenda}
        ${bezTerminu ? ` · Bez terminu: ${bezTerminu} zad. <button class="link" data-widok="wszystkie">zobacz →</button>` : ''}</p>`;
@@ -1529,6 +1532,28 @@ document.addEventListener('mouseout', e => { const u = e.target.closest('.uwaga'
 document.addEventListener('focusin', e => { const u = e.target.closest('.uwaga'); if (u) pokazDymek(u); });
 document.addEventListener('focusout', e => { const u = e.target.closest('.uwaga'); if (u) schowajDymek(u); });
 
+/* ---------- Czyszczenie kalendarza ---------- */
+const oknoWyczysc = document.getElementById('okno-wyczysc');
+document.getElementById('form-wyczysc').addEventListener('submit', e => {
+  e.preventDefault();
+  const f = e.target;
+  const kopia = { dane: JSON.parse(JSON.stringify(dane)), sesje: { ...sesje }, wolne: { ...wolne }, profil };
+  dane = { wersja: 1, zadania: [] };
+  sesje = {};
+  if (f.wolne.checked) wolne = {};
+  const nowyProfil = f.profil.checked;
+  if (nowyProfil) { profil = null; try { localStorage.removeItem(KLUCZ_PROFIL); } catch (err) { /* nic */ } }
+  zapiszLokalnie();
+  oknoWyczysc.close();
+  odswiez();
+  powiadom('Kalendarz wyczyszczony. Możesz wczytać nowy plik JSON.', 'Cofnij', () => {
+    dane = kopia.dane; sesje = kopia.sesje; wolne = kopia.wolne; profil = kopia.profil;
+    zapiszLokalnie();
+    odswiez();
+  });
+  if (nowyProfil) setTimeout(otworzProfil, 400);
+});
+
 /* =====================================================================
    Powiadomienia (z przyciskiem "Cofnij")
    ===================================================================== */
@@ -1582,6 +1607,8 @@ document.addEventListener('click', e => {
     case 'zapisz': zapiszDoPliku(); break;
     case 'anuluj': okno.close(); break;
     case 'zamknij-dzien': oknoDnia.close(); break;
+    case 'wyczysc': document.getElementById('form-wyczysc').reset(); oknoWyczysc.showModal(); break;
+    case 'zamknij-wyczysc': oknoWyczysc.close(); break;
     case 'profil': otworzProfil(); break;
     case 'wybierz-styl': krokProfilu.grupa = el.dataset.styl; krokProfilu.krok = 2; rysujProfil(); break;
     case 'wstecz-profil':
