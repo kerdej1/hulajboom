@@ -1062,8 +1062,12 @@ function zbierzFormularz() {
   const godziny = parseFloat(String(f.get('godziny') || '').replace(',', '.'));
   if (okresowe) tagi.push(TAG_OKRESOWE);
   else {
-    if (czas > 0) tagi.push(tagCzasu(Math.round(czas * 10) / 10));
-    if (godziny > 0) tagi.push(`${ZNAK_CZASU}${Math.round(godziny * 10) / 10}h`);   // ręcznie wpisane godziny pracy
+    // pola dni i godzin są połączone – zapisujemy to, które użytkownik wpisał (drugie wynika z krzywej)
+    if (formularz.dataset.zrodlo === 'godziny') {
+      if (godziny > 0) tagi.push(`${ZNAK_CZASU}${Math.round(godziny * 10) / 10}h`);
+    } else if (czas > 0) {
+      tagi.push(tagCzasu(Math.round(czas * 10) / 10));
+    }
   }
   const poprzednie = edytowaneId !== null ? znajdz(edytowaneId) : null;
   return {
@@ -1085,17 +1089,29 @@ function ustawPolaOkresowe() {
   formularz.czas.placeholder = `domyślnie ${formatDni(DOMYSLNY_CZAS[formularz.querySelector('input[name="priorytet"]:checked')?.value || 'sredni'])}`;
 }
 
-/** Rekomendowana liczba godzin z krzywej użytkownika – pokazywana przy polu "Godziny pracy". */
+function zaokr(v) { return Math.round(v * 10) / 10; }
+
+/** Dni ↔ godziny: wpisanie jednego od razu przelicza drugie wg krzywej użytkownika. */
+function przeliczDniGodziny(e) {
+  const nazwa = e && e.target && e.target.name;
+  const v = parseFloat(String(e && e.target ? e.target.value : '').replace(',', '.'));
+  if (nazwa === 'czas') {
+    formularz.dataset.zrodlo = 'dni';
+    formularz.godziny.value = v > 0 ? zaokr(godzinyZDni(v)) : '';
+  } else if (nazwa === 'godziny') {
+    formularz.dataset.zrodlo = 'godziny';
+    formularz.czas.value = v > 0 ? zaokr(dniZGodzin(v)) : '';
+  }
+}
+
+/** Podpowiedzi w pustych polach: domyślny czas wg ważności i jego godziny. */
 function pokazRekomendacjeGodzin() {
-  const dniPole = parseFloat(String(formularz.czas.value).replace(',', '.'));
   const pri = formularz.querySelector('input[name="priorytet"]:checked')?.value || 'sredni';
-  const dni = dniPole > 0 ? dniPole : DOMYSLNY_CZAS[pri];
-  const rek = Math.round(godzinyZDni(dni) * 2) / 2;
-  formularz.godziny.placeholder = `${String(rek).replace('.', ',')} (rekomendowane)`;
-  const el = document.getElementById('rekomendacja-godzin');
-  const wpisane = parseFloat(String(formularz.godziny.value).replace(',', '.'));
-  el.innerHTML = `Rekomendacja dla Twojego stylu pracy: <b>${formatGodzin(rek)}</b> (${formatDni(dni)})`
-    + (wpisane > 0 ? ` · <button type="button" class="link" data-akcja="godziny-auto">wróć do rekomendacji</button>` : ' · zostaw puste, żeby jej użyć');
+  const dni = DOMYSLNY_CZAS[pri];
+  formularz.czas.placeholder = `domyślnie ${String(dni).replace('.', ',')}`;
+  formularz.godziny.placeholder = `domyślnie ${String(zaokr(godzinyZDni(dni))).replace('.', ',')}`;
+  document.getElementById('rekomendacja-godzin').textContent =
+    'Pola są połączone: wpisz dni albo godziny – drugie przeliczy się samo wg Twojego stylu pracy.';
 }
 
 function podgladPlanu() {
@@ -1137,10 +1153,12 @@ function otworzFormularz(id = null, domyslnyTermin = null) {
   formularz.termin.value = z && z.termin ? z.termin : (domyslnyTermin || '');
   formularz.tagi.value = z ? widoczneTagi(z).join(', ') : '';
   formularz.okresowe.checked = z ? czyOkresowe(z) : false;
-  const czas = z ? czasZTagu(z) : null;
-  formularz.czas.value = czas !== null ? czas : '';
+  // dni i godziny pokazujemy oba (jedno wpisane, drugie przeliczone)
   const godz = z ? godzinyZTagu(z) : null;
-  formularz.godziny.value = godz !== null ? godz : '';
+  const czas = z ? czasZTagu(z) : null;
+  formularz.dataset.zrodlo = godz !== null ? 'godziny' : 'dni';
+  formularz.czas.value = czas !== null ? czas : godz !== null ? zaokr(dniZGodzin(godz)) : '';
+  formularz.godziny.value = godz !== null ? godz : czas !== null ? zaokr(godzinyZDni(czas)) : '';
   const pri = z ? z.priorytet : 'sredni';
   formularz.querySelector(`input[name="priorytet"][value="${pri}"]`).checked = true;
   document.getElementById('blad-tytul').textContent = '';
@@ -1153,7 +1171,7 @@ function otworzFormularz(id = null, domyslnyTermin = null) {
   formularz.tytul.focus();
 }
 
-formularz.addEventListener('input', podgladPlanu);
+formularz.addEventListener('input', e => { przeliczDniGodziny(e); podgladPlanu(); });
 formularz.addEventListener('submit', e => {
   e.preventDefault();
   const w = zbierzFormularz();
@@ -1426,7 +1444,6 @@ document.addEventListener('click', e => {
     case 'zapisz': zapiszDoPliku(); break;
     case 'anuluj': okno.close(); break;
     case 'zamknij-dzien': oknoDnia.close(); break;
-    case 'godziny-auto': formularz.godziny.value = ''; podgladPlanu(); break;
     case 'profil': otworzProfil(); break;
     case 'wybierz-styl': krokProfilu.styl = el.dataset.styl; rysujProfil(); break;
     case 'wstecz-profil': krokProfilu.styl = null; rysujProfil(); break;
