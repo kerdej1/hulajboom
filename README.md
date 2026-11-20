@@ -62,6 +62,8 @@ Wielu studentów wie, że zakuwanie nie działa, ale nie widzi, o ile – chciel
 2. **Aplikacja ucząca się od użytkownika** – po sesji pytanie „ile faktycznie pracowałeś?” i automatyczna korekta jego indywidualnej funkcji.
 3. **Dodawanie zadań zwykłym zdaniem** – np. „kolos z fizyki w piątek, ok. 3 dni nauki” → wypełniony formularz.
 4. **Zakładka „Projekty”** – większy cel rozbity na kroki. Np. *egzamin z matematyki dyskretnej* → research, temat 1, temat 2… połączony z terminarzem (sesja pokazuje, którym krokiem się zająć), albo *wycieczka do Egiptu* → mieszkanie, loty, klapki… jako niezależna lista kroków z postępem.
+5. **Statystyki postępu** – ile zadań i godzin pracy załatwiłem dziś i w tym tygodniu, jak często realizuję zaplanowane sesje, jak trafne były moje szacunki czasu, które dni tygodnia są najbardziej produktywne. Statystyki pomagałyby też aplikacji lepiej planować (np. przez korektę funkcji pracy z punktu 2).
+6. **Plany długoterminowe i szablony** – np. **plan 12-tygodniowy** (cel na semestr rozbity na tygodnie, z tygodniowym podsumowaniem) oraz gotowe **szablony** do szybkiego startu: „sesja egzaminacyjna”, „projekt zaliczeniowy”, „nauka języka”, „przeprowadzka”… Szablon tworzyłby od razu zestaw zadań lub kroków projektu z sensownym czasem pracy.
 
 **Ograniczenia:**
 - Odhaczone sesje, dni wykreślone i styl pracy są zapisywane **tylko w przeglądarce** (żeby nie zmieniać formatu JSON) – na innym komputerze trzeba je ustawić od nowa.
