@@ -1,12 +1,14 @@
 /* ===== Planner studenta – czysty, minimalistyczny styl ===== */
 :root {
-  --tlo: #f7f7f5;
+  --tlo: #fafaf9;
   --karta: #ffffff;
-  --tekst: #1f2328;
-  --szary: #6b7280;
-  --linia: #e6e6e3;
-  --akcent: #3b5bdb;
-  --akcent-jasny: #edf2ff;
+  --tekst: #18181b;
+  --szary: #71717a;
+  --linia: #ebebe8;
+  --akcent: #4338ca;
+  --akcent-jasny: #eef2ff;
+  --tusz: #18181b;          /* główny kolor przycisków – czarny tusz */
+  --cien: 0 1px 2px rgba(24,24,27,.04), 0 4px 16px rgba(24,24,27,.04);
   --wysoki: #e03131;
   --sredni: #e8890c;
   --niski: #5c940d;
@@ -27,7 +29,9 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
   background: var(--tlo);
   color: var(--tekst);
   font-size: 15px;
@@ -781,3 +785,86 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .tabela-progow td:first-child { display: flex; align-items: center; gap: 6px; }
 .tabela-progow .kropka-kal { cursor: default; }
 .progi-pola { grid-template-columns: 1fr 1fr auto; }
+
+
+/* =====================================================================
+   SZATA GRAFICZNA – bardzo minimalistyczna
+   Dużo bieli, cienkie linie, czarny tusz jako główny kolor, kolor tylko
+   tam, gdzie niesie informację (intensywność, ważność).
+   ===================================================================== */
+.gora {
+  background: rgba(250, 250, 249, .85);
+  backdrop-filter: saturate(160%) blur(10px);
+  -webkit-backdrop-filter: saturate(160%) blur(10px);
+  border-bottom: 1px solid var(--linia);
+}
+.gora-wnetrze { padding: 18px 24px 10px; }
+.logo-znak {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: var(--tusz); font-size: 14px;
+}
+h1 { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
+.podtytul { font-size: 12.5px; }
+
+.przycisk {
+  border-color: var(--linia); border-radius: 999px; padding: 7px 14px;
+  font-size: 13.5px; font-weight: 500; transition: background .15s, border-color .15s;
+}
+.przycisk:hover { background: #f4f4f2; border-color: #deded9; }
+.przycisk.glowny { background: var(--tusz); border-color: var(--tusz); color: #fff; }
+.przycisk.glowny:hover { background: #000; filter: none; }
+.przycisk.maly { padding: 4px 11px; }
+
+.zakladki { padding: 0 24px 10px; gap: 6px; }
+.zakladka {
+  border: none; border-radius: 999px; padding: 6px 14px;
+  font-size: 13.5px; font-weight: 500; color: var(--szary);
+}
+.zakladka:hover { color: var(--tekst); background: #f1f1ef; }
+.zakladka.aktywna { background: var(--tusz); color: #fff; font-weight: 500; border: none; }
+
+.tresc { padding: 24px; }
+
+.przelacznik { border-radius: 999px; padding: 3px; gap: 2px; background: #f1f1ef; border-color: transparent; }
+.przelacznik .maly-tekst { padding: 0 6px 0 10px; }
+.przelacznik button { border: none !important; border-radius: 999px; padding: 5px 12px; font-size: 13px; }
+.przelacznik button.wl { background: #fff; color: var(--tekst); box-shadow: 0 1px 2px rgba(0,0,0,.08); font-weight: 600; }
+.filtry input, .filtry select { border-radius: 999px; padding: 7px 14px; border-color: var(--linia); }
+
+/* kalendarz */
+.dzien-kal { border-color: #efefec; border-radius: 12px; box-shadow: none; }
+.dzien-kal[data-dzien]:hover { border-color: #dcdcd7; }
+.dzien-kal.dzisiaj { border-color: var(--tusz); box-shadow: 0 0 0 1px var(--tusz) inset; }
+.dzisiaj .kal-dzien, .dzisiaj .kal-nr { color: var(--tekst); }
+.kal-tydzien .kal-gora { border-bottom-color: #f1f1ef; }
+.dzien-kal.przeszly { background: transparent; }
+.kal-naglowki span { font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: .06em; }
+.karta { background: #fff; border-color: #efefec; border-left-width: 3px; border-radius: 8px; }
+.sesja-kal { background: #fafaff; border-color: #dfe3fb; }
+.dodaj-w-dniu { border-color: #ececea; border-radius: 8px; }
+
+/* kolumny i kafelki */
+.kol { background: #f4f4f2; border-radius: 14px; }
+.kafelek { border-color: #efefec; border-left-width: 3px; border-radius: 10px; box-shadow: none; }
+.kafelek:hover { box-shadow: var(--cien); }
+
+/* okna */
+.okno { border-radius: 18px; box-shadow: 0 24px 80px rgba(24,24,27,.18); }
+.okno::backdrop { background: rgba(24, 24, 27, .28); backdrop-filter: blur(2px); }
+.pole input[type="text"], .pole input[type="date"], .pole input[type="number"], .pole textarea {
+  border-radius: 10px; border-color: var(--linia); background: #fff;
+}
+.segmenty { border-radius: 999px; padding: 3px; background: #f1f1ef; border-color: transparent; gap: 2px; }
+.segmenty span { border-radius: 999px; }
+.segmenty label + label span { border-left: none; }
+.segmenty input:checked + span { background: #fff; color: var(--tekst); box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+.podglad-planu { background: #f6f6f4; border-radius: 10px; }
+.styl-przycisk, .tabela-profil { border-radius: 14px; border-color: #ececea; }
+.styl-przycisk:hover, .tabela-profil:hover { border-color: var(--tusz); box-shadow: var(--cien); }
+.tabela-naglowek { color: var(--tekst); }
+
+/* drobiazgi */
+.znaczek { border-radius: 6px; }
+.toast { border-radius: 12px; background: var(--tusz); }
+.toast button { color: #a5b4fc; }
+.link { color: var(--akcent); }

@@ -194,8 +194,12 @@ function wczytajZPliku(plik) {
       return;
     }
     const poprzednie = { dane, sesje };
+    // odhaczone sesje zostawiamy tylko dla zadań, które w nowym pliku mają to samo id i ten sam tytuł
+    // (np. gdy wczytujesz z powrotem plik, który sam zapisałeś); reszta nie pasuje do nowych zadań
+    const stareTytuly = Object.fromEntries(dane.zadania.map(z => [z.id, z.tytul]));
     dane = wynik.dane;
-    sesje = {};          // nowe zadania = nowe id, więc stare odhaczone sesje nie pasują
+    sesje = Object.fromEntries(Object.entries(sesje).filter(([id]) =>
+      dane.zadania.some(z => String(z.id) === id && z.tytul === stareTytuly[id])));
     zapiszLokalnie();
     odswiez();
     let tekst = `Wczytano ${dane.zadania.length} zadań z pliku „${plik.name}”.`;
@@ -1605,5 +1609,17 @@ if (!wczytajLokalnie() && window.PRZYKLADOWE_DANE) {
   dane = normalizuj(window.PRZYKLADOWE_DANE).dane;
   zapiszLokalnie();
 }
+// Sprzątanie: powtórki, których egzamin już nie istnieje (np. usunięty wcześniej
+// tryb sesji), nie mają sensu – usuwamy je z danych zapisanych w przeglądarce.
+(() => {
+  const egzaminy = new Set(dane.zadania.filter(czyEgzamin).map(e => e.tytul));
+  const sieroty = dane.zadania.filter(z => czyPowtorka(z) && !egzaminy.has(z.tytul.split(' – ').slice(1).join(' – ')));
+  if (!sieroty.length) return;
+  const ids = new Set(sieroty.map(z => z.id));
+  dane.zadania = dane.zadania.filter(z => !ids.has(z.id));
+  for (const id of ids) delete sesje[id];
+  zapiszLokalnie();
+  setTimeout(() => powiadom(`Usunięto ${sieroty.length} powtórek, których egzamin już nie istnieje.`), 300);
+})();
 odswiez();
 if (!profil) otworzProfil();   // pierwsze wejście – pytamy o styl pracy
