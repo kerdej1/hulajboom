@@ -981,3 +981,63 @@ h1 { font-weight: 700; }
 .obecny-profil { background: var(--akcent-jasny); color: #312e81; }
 .podglad-planu { background: var(--akcent-jasny); }
 .pusto { background: rgba(255,255,255,.7); border-color: #dcdcf0; }
+
+/* =====================================================================
+   SZATA v3 – bez fioletu: czarny tusz i czarne gradienty jako akcent
+   (kolory intensywności zostają bez zmian, bo niosą informację)
+   ===================================================================== */
+:root {
+  --akcent: #18181b;
+  --akcent-jasny: #f4f4f5;
+  --czarny-gradient: linear-gradient(135deg, #3f3f46 0%, #18181b 55%, #000 100%);
+}
+body {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(24,24,27,.05), transparent 60%),
+    var(--tlo);
+  background-attachment: fixed;
+}
+:root { --tlo: #f7f7f6; }
+.logo-znak { background: var(--czarny-gradient); box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.przycisk.glowny { background: var(--czarny-gradient); box-shadow: 0 4px 12px rgba(0,0,0,.22); }
+.przycisk.glowny:hover { background: linear-gradient(135deg, #52525b 0%, #27272a 55%, #000 100%); }
+.zakladka.aktywna { background: var(--czarny-gradient); box-shadow: 0 4px 12px rgba(0,0,0,.2); }
+.przelacznik button.wl { color: var(--tekst); }
+.link { color: #18181b; text-decoration: underline; text-underline-offset: 2px; }
+.legenda-przycisk.aktywny { background: #f4f4f5; border-color: #d4d4d8; color: var(--tekst); }
+.toast button { color: #fde68a; }
+
+/* dzisiejszy dzień – czarna ramka */
+.dzien-kal.dzisiaj { border-color: #18181b; box-shadow: 0 0 0 1.5px #18181b inset, 0 8px 24px rgba(0,0,0,.10); }
+.dzisiaj .kal-dzien, .dzisiaj .kal-nr { color: #18181b; }
+.kal-tydzien .dzien-kal.dzisiaj .kal-gora { background: #f4f4f5; }
+.sesja-kal { background: #fafafa; border-color: #e4e4e7; }
+.sesja-kal .karta-tytul { color: #3f3f46; }
+.sesja-znak { border-color: #52525b; }
+.kropka-kal.sesja { border-color: #52525b; }
+.kropki-praca .kropka-kal.sesja { border-color: #a1a1aa; }
+.kropka-kal.sesja.zrobiona { background: #52525b; }
+
+/* panel stylu pracy i okna – zaznaczenia na czarno */
+.styl-przycisk.wybrany, .tabela-profil.wybrany, .wlasne-profil.wybrany { border-color: #18181b; }
+.znacznik-wybrane { background: var(--czarny-gradient); }
+.obecny-profil, .podglad-planu { background: #f4f4f5; color: var(--tekst); }
+.wlasne-profil summary, .tabela-naglowek { color: var(--tekst); }
+
+/* kratki kalendarza – po najechaniu lekko się powiększają */
+.dzien-kal {
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+  will-change: transform;
+}
+.dzien-kal[data-dzien]:hover {
+  transform: scale(1.025);
+  border-color: #d4d4d8;
+  box-shadow: 0 10px 28px rgba(0,0,0,.10);
+  position: relative;
+  z-index: 2;
+}
+.dzien-kal.dzisiaj[data-dzien]:hover { border-color: #18181b; }
+@media (prefers-reduced-motion: reduce) {
+  .dzien-kal { transition: none; }
+  .dzien-kal[data-dzien]:hover { transform: none; }
+}
