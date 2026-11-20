@@ -304,10 +304,19 @@ function szacowanyCzas(z) {
 /* ---------- Godziny pracy ----------
    Szacowany czas x (dni) = ile dni potrzeba, żeby zrobić zadanie SPOKOJNIE.
    Spokojne tempo = sesja ok. 3 h co ok. 2,4 dnia (czyli co 2–3 dni),
-   więc 1 dzień spokojnego planu ≈ 1,25 h czystej pracy (30 dni ≈ 37,5 h). */
+   Ile to czystej pracy? Krótkie zadania są bardziej "gęste" niż długie:
+   3 dni ≈ 2,5 h/dzień (≈ 7,5 h), 30 dni ≈ 1,25 h/dzień (≈ 37,5 h).
+   Dopasowana krzywa potęgowa przez te dwa punkty:
+       godziny(x) = A · x^K,  K = 1 + log10(1,25 / 2,5) ≈ 0,699,  A = 7,5 / 3^K ≈ 3,48
+   Rośnie wolniej niż liniowo: 1 dzień ≈ 3,5 h, 10 dni ≈ 17 h, 60 dni ≈ 61 h. */
 const SESJA_SPOKOJNA_H = 3;          // długość sesji przy spokojnym tempie
 const ODSTEP_SPOKOJNY = 2.4;         // co ile dni sesja przy spokojnym tempie
-const GODZIN_NA_DZIEN_PLANU = SESJA_SPOKOJNA_H / ODSTEP_SPOKOJNY;   // 1,25 h
+const KRZYWA_K = 1 + Math.log10(1.25 / 2.5);          // ≈ 0,699
+const KRZYWA_A = 7.5 / Math.pow(3, KRZYWA_K);          // ≈ 3,48
+/** Szacowany czas (dni spokojnego planu) → godziny czystej pracy. */
+function godzinyZDni(x) { return x > 0 ? KRZYWA_A * Math.pow(x, KRZYWA_K) : 0; }
+/** Odwrotnie: godziny pracy → ile dni spokojnego planu to odpowiada. */
+function dniZGodzin(h) { return h > 0 ? Math.pow(h / KRZYWA_A, 1 / KRZYWA_K) : 0; }
 // Limity oparte na badaniach:
 // – Ericsson, Krampe i Tesch-Römer (1993): przy wymagającej pracy umysłowej korzyści maleją
 //   powyżej ok. 2 h, a powyżej ok. 4 h dziennie praktycznie znikają → max 4 h dziennie na zadanie.
@@ -329,11 +338,11 @@ function wpisySesji(id) {
 function zrobioneSesje(id) { return wpisySesji(id).map(w => w.d); }
 function godzinyZrobione(id) { return wpisySesji(id).reduce((s, w) => s + (Number(w.h) || 0), 0); }
 
-function godzinyRazem(z) { return szacowanyCzas(z) * GODZIN_NA_DZIEN_PLANU; }
+function godzinyRazem(z) { return godzinyZDni(szacowanyCzas(z)); }
 function godzinyPozostale(z) { return Math.max(0, godzinyRazem(z) - godzinyZrobione(z.id)); }
 /** Pozostała praca wyrażona w dniach spokojnego planu (do liczenia intensywności). */
 function pozostalaPraca(z) {
-  return godzinyPozostale(z) / GODZIN_NA_DZIEN_PLANU;
+  return dniZGodzin(godzinyPozostale(z));
 }
 /** Jaka część potrzebnej pracy mieści się w czasie do terminu (1 = dokładnie tyle, ile trzeba). */
 function wskaznikCzasu(z) {
