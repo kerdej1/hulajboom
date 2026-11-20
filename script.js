@@ -308,8 +308,17 @@ function szacowanyCzas(z) {
 const SESJA_SPOKOJNA_H = 3;          // długość sesji przy spokojnym tempie
 const ODSTEP_SPOKOJNY = 2.4;         // co ile dni sesja przy spokojnym tempie
 const GODZIN_NA_DZIEN_PLANU = SESJA_SPOKOJNA_H / ODSTEP_SPOKOJNY;   // 1,25 h
-const MAX_SESJA_H = 4;               // dłuższa sesja daje coraz mniej (Rohrer i Pashler 2007) – wtedy uczymy się częściej
-const MAX_DZIEN_H = 8;               // więcej w jednym dniu i tak się nie zmieści
+// Limity oparte na badaniach:
+// – Ericsson, Krampe i Tesch-Römer (1993): przy wymagającej pracy umysłowej korzyści maleją
+//   powyżej ok. 2 h, a powyżej ok. 4 h dziennie praktycznie znikają → max 4 h dziennie na zadanie.
+// – Rawson i Dunlosky (2011, 2022): nauka + 3 spaced powtórki ("successive relearning")
+//   zwykle wystarczają do pełnego efektu → przy nauce co najmniej 4 sesje.
+// – Mazza i in. (2016): sen między sesjami przyspiesza ponowną naukę i poprawia
+//   zapamiętanie → najwyżej jedna sesja dziennie na zadanie.
+const MAX_SESJA_H = 4;               // max na jedno zadanie w jednym dniu
+const MAX_DZIEN_H = 4;
+const NAUKA_SESJA_H = 2;             // przy nauce: sesje do ok. 2 h (powyżej korzyści maleją)
+const NAUKA_MIN_SESJI = 4;           // nauka + 3 powtórki
 const GODZIN_W_DNIU_POWTORKI = 6;    // "1 dzień" jako jednostka długości powtórki
 
 /** Odhaczone sesje: lista { d: data, h: godziny }. (Stare wpisy to same daty – liczymy je jako 3 h.) */
@@ -453,16 +462,25 @@ function planSesji(z) {
   const koniec = doTerminu - 1;
   if (koniec < start) return [];
 
-  // okno: ostatnie ceil(x) dostępnych dni przed terminem (spokojny plan zaczyna się x dni przed)
-  const okno = dniRobocze(start, koniec).slice(-Math.max(1, Math.ceil(pozostalaPraca(z))));
-  if (!okno.length) return [];
-
-  let n = Math.max(1, Math.round(okno.length / ODSTEP_SPOKOJNY));   // tyle sesji przy spokojnych przerwach
-  // przy nauce co najmniej 2 sesje – jedna powtórka po przerwie daje dużo więcej niż jedna długa sesja
-  if (czyNauka(z) && n < 2 && okno.length >= 2 && H >= 1.5) n = 2;
-  if (H / n > MAX_SESJA_H) n = Math.min(okno.length, Math.ceil(H / MAX_SESJA_H));
-  n = Math.min(n, okno.length);
-  const h = Math.min(MAX_DZIEN_H, H / n);
+  const dostepne = dniRobocze(start, koniec);
+  if (!dostepne.length) return [];
+  const juzSesji = zrobioneSesje(z.id).length;
+  let okno, n;
+  if (czyNauka(z)) {
+    // NAUKA: liczba sesji z badań – co najmniej nauka + 3 powtórki, a sesje nie dłuższe niż ok. 2 h
+    const wszystkich = Math.max(NAUKA_MIN_SESJI, Math.ceil(godzinyRazem(z) / NAUKA_SESJA_H));
+    n = Math.max(1, wszystkich - juzSesji);
+    // okno: spokojny plan (x dni), ale tak długie, żeby między sesjami był co najmniej dzień przerwy
+    // (Cepeda i in. 2008: przy teście za ok. tydzień najlepsza przerwa to 20–40% tego czasu)
+    okno = dostepne.slice(-Math.max(2 * n - 1, Math.ceil(pozostalaPraca(z))));
+  } else {
+    // POZOSTAŁE ZADANIA: spokojne tempo – sesja ok. 3 h co ok. 2,4 dnia w oknie x dni
+    okno = dostepne.slice(-Math.max(1, Math.ceil(pozostalaPraca(z))));
+    n = Math.max(1, Math.round(okno.length / ODSTEP_SPOKOJNY));
+    if (H / n > MAX_SESJA_H) n = Math.ceil(H / MAX_SESJA_H);
+  }
+  n = Math.min(n, okno.length);            // najwyżej jedna sesja dziennie
+  const h = Math.min(MAX_DZIEN_H, H / n);   // dłużej niż 4 h dziennie nie ma sensu
 
   const dni = czyNauka(z) ? rozkladEbbinghausa(okno, n, doTerminu) : rozkladRowny(okno, n);
   const juz = zrobioneSesje(z.id).length;
@@ -481,9 +499,11 @@ function opisPlanu(z, plan) {
   const godz = plan.reduce((s, x) => s + x.h, 0);
   const nauka = czyNauka(z) ? ' · dni dobrane wg krzywej zapominania' : '';
   let tekst = `${plan.length} ${plan.length === 1 ? 'sesja' : plan.length < 5 ? 'sesje' : 'sesji'} po ${formatGodzin(plan[0].h)} (≈ ${formatGodzin(godz)} pracy)${nauka}: ${listaDniPracy(plan)}`;
-  const hSpokojnie = godzinyRazem(z) / Math.max(1, Math.round(szacowanyCzas(z) / ODSTEP_SPOKOJNY));
+  const hSpokojnie = czyNauka(z)
+    ? godzinyRazem(z) / Math.max(NAUKA_MIN_SESJI, Math.ceil(godzinyRazem(z) / NAUKA_SESJA_H))
+    : godzinyRazem(z) / Math.max(1, Math.round(szacowanyCzas(z) / ODSTEP_SPOKOJNY));
   if (plan[0].h > Math.max(hSpokojnie, SESJA_SPOKOJNA_H) * 1.1) tekst += ` <span class="tekst-pilne">· mniej czasu niż na spokojne tempo, więc sesje są dłuższe (spokojnie: ok. ${formatGodzin(hSpokojnie)})</span>`;
-  if (H - godz > 0.25) tekst += ` <span class="tekst-krytyczne">· nawet po ${formatGodzin(MAX_DZIEN_H)} dziennie zabraknie ${formatGodzin(H - godz)}</span>`;
+  if (H - godz > 0.25) tekst += ` <span class="tekst-krytyczne">· przy rozsądnym limicie ${formatGodzin(MAX_DZIEN_H)} dziennie zabraknie ${formatGodzin(H - godz)}</span>`;
   return tekst;
 }
 
