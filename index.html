@@ -98,6 +98,29 @@
     <div id="szczegoly-tresc" class="szcz"></div>
   </dialog>
 
+  <!-- Wykreślanie dnia (wakacje, wyjazd...) -->
+  <dialog id="okno-dnia" class="okno okno-dnia">
+    <form id="form-dnia" novalidate>
+      <h2 id="dzien-tytul" style="text-transform: capitalize"></h2>
+      <div id="dzien-info" class="info"></div>
+      <label class="pole">
+        <span>Powód</span>
+        <input name="powod" type="text" maxlength="60" placeholder="np. wakacje, wyjazd, choroba" autocomplete="off">
+      </label>
+      <label class="pole">
+        <span>Do dnia (opcjonalnie)</span>
+        <input name="doDnia" type="date">
+        <small class="podpowiedz">Wybierz, jeśli chcesz wykreślić kilka dni naraz, np. cały wyjazd.</small>
+      </label>
+      <div class="okno-stopka">
+        <button type="button" id="dzien-przywroc" class="przycisk usun-przycisk" data-akcja="przywroc-dzien" hidden>Przywróć dzień</button>
+        <span style="flex:1"></span>
+        <button type="button" class="przycisk" data-akcja="zamknij-dzien">Anuluj</button>
+        <button type="submit" id="dzien-zapisz" class="przycisk glowny">Wykreśl dzień</button>
+      </div>
+    </form>
+  </dialog>
+
   <input type="file" id="plik" accept=".json,application/json" hidden>
   <div id="upuszczanie" class="upuszczanie" hidden>Upuść plik JSON, aby wczytać zadania</div>
   <div id="powiadomienia" class="powiadomienia" aria-live="polite"></div>

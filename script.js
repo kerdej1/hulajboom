@@ -16,7 +16,8 @@
 
 // ---------- Ustawienia ----------
 const KLUCZ_DANE = 'planner.dane.v2';     // zadania (ten sam format co plik JSON)
-const KLUCZ_SESJE = 'planner.sesje.v2';   // odhaczone sesje pracy: { idZadania: [daty] }
+const KLUCZ_SESJE = 'planner.sesje.v2';   // odhaczone dni pracy: { idZadania: [daty] }
+const KLUCZ_WOLNE = 'planner.wolne.v2';   // wykreślone dni (wakacje, wyjazd...): { data: powód }
 
 const PRIORYTETY = ['niski', 'sredni', 'wysoki'];
 const NAZWA_PRIORYTETU = { niski: 'Niski', sredni: 'Średni', wysoki: 'Wysoki' };
@@ -45,6 +46,7 @@ const ZNAK_CZASU = '⏱';                   // np. tag "⏱30d" = szacowany czas
 // ---------- Stan aplikacji ----------
 let dane = { wersja: 1, zadania: [] };
 let sesje = {};
+let wolne = {};          // dni wykreślone – nie liczą się do czasu na pracę
 let widok = 'terminarz';   // widok startowy: kalendarz
 const filtry = { szukaj: '', tag: '', grupuj: 'poziom', pokazZrobione: false };
 let szczegolyId = null;   // zadanie otwarte w oknie szczegółów
@@ -230,9 +232,14 @@ function zapiszLokalnie() {
   try {
     localStorage.setItem(KLUCZ_DANE, JSON.stringify(dane));
     localStorage.setItem(KLUCZ_SESJE, JSON.stringify(sesje));
+    localStorage.setItem(KLUCZ_WOLNE, JSON.stringify(wolne));
   } catch (e) { /* np. tryb prywatny – aplikacja działa dalej, tylko bez autozapisu */ }
 }
 function wczytajLokalnie() {
+  try {
+    const w = JSON.parse(localStorage.getItem(KLUCZ_WOLNE) || '{}');
+    wolne = w && typeof w === 'object' && !Array.isArray(w) ? w : {};
+  } catch (e) { wolne = {}; }
   try {
     const d = localStorage.getItem(KLUCZ_DANE);
     if (d) {
@@ -273,6 +280,21 @@ function czasZTagu(z) {
 }
 function tagCzasu(dni) { return `${ZNAK_CZASU}${dni}d`; }
 
+/* ---------- Dni wykreślone ---------- */
+function czyWolny(data) { return Object.prototype.hasOwnProperty.call(wolne, data); }
+/** Dni (jako przesunięcia od dziś) od..do włącznie, bez dni wykreślonych. */
+function dniRobocze(od, doDnia) {
+  const wynik = [];
+  for (let o = od; o <= doDnia; o++) if (!czyWolny(dodajDni(DZIS, o))) wynik.push(o);
+  return wynik;
+}
+/** Ile dni do terminu można realnie przeznaczyć na pracę (bez wykreślonych). */
+function dniNaPrace(z) {
+  if (!z.termin) return Infinity;
+  const doTerminu = roznicaDni(DZIS, z.termin);
+  return doTerminu <= 0 ? 0 : dniRobocze(0, doTerminu - 1).length;
+}
+
 /** Szacowany czas pracy w dniach (podany przez użytkownika albo domyślny). */
 function szacowanyCzas(z) {
   return czasZTagu(z) ?? (czyPowtorka(z) ? 1 : DOMYSLNY_CZAS[z.priorytet] || 1);
@@ -285,9 +307,8 @@ function wskaznikCzasu(z) {
   if (!z.termin) return Infinity;
   const praca = pozostalaPraca(z);
   if (praca === 0) return Infinity;
-  const dni = roznicaDni(DZIS, z.termin);
-  if (dni < 0) return -1;
-  return dni / praca;
+  if (roznicaDni(DZIS, z.termin) < 0) return -1;
+  return dniNaPrace(z) / praca;   // wykreślone dni (np. wakacje) nie liczą się jako czas na pracę
 }
 /** Poziom intensywności: luz / spokojnie / pora / pilne / krytyczne (albo okresowe). */
 function poziom(z) {
@@ -331,14 +352,14 @@ function planSesji(z) {
   const koniec = doTerminu - 1;                    // ostatni dzień przed terminem
   if (koniec < start) return [];                   // termin dziś lub minął – nie ma już dni "przed"
 
-  const okno = Math.ceil(2 * szacowanyCzas(z));
-  const poczatek = Math.max(start, koniec - okno + 1);
-  const dlugosc = koniec - poczatek + 1;
-  // najwyżej jeden dzień pracy dziennie na zadanie – jeśli dni jest mniej niż pracy,
-  // planujemy każdy dostępny dzień, a brakującą pracę pokazuje poziom intensywności
-  const ile = Math.min(zostalo, dlugosc);
+  // dostępne dni bez wykreślonych; bierzemy ostatnie 2·x z nich (okno pracy)
+  const dostepne = dniRobocze(start, koniec).slice(-Math.ceil(2 * szacowanyCzas(z)));
+  if (!dostepne.length) return [];
+  // najwyżej jeden dzień pracy dziennie na zadanie – gdy dni jest mniej niż pracy,
+  // zajmujemy każdy dostępny dzień (plan się "kompresuje")
+  const ile = Math.min(zostalo, dostepne.length);
   const dni = [];
-  for (let i = 0; i < ile; i++) dni.push(koniec - Math.floor(i * dlugosc / ile));
+  for (let i = 0; i < ile; i++) dni.push(dostepne[dostepne.length - 1 - Math.floor(i * dostepne.length / ile)]);
   dni.reverse();
 
   return dni.map((offset, i) => ({
@@ -538,6 +559,10 @@ function pokazSzczegoly(id) {
     planHtml = `${plan.length} z ${potrzebne} dni pracy zaplanowane: ` + listaDniPracy(plan)
       + (brakuje ? ` <span class="tekst-pilne">· czasu jest mniej niż na spokojne tempo – ${formatDni(potrzebne - zrobioneDni)} pracy trzeba zmieścić w ${formatDni(plan.length)}</span>` : '');
   }
+  const doTerminu = z.termin ? roznicaDni(DZIS, z.termin) : null;
+  const wykreslone = doTerminu > 0 ? doTerminu - dniNaPrace(z) : 0;
+  const dniNaPraceHtml = okresowe || !z.termin ? '–'
+    : `${formatDni(dniNaPrace(z))} do terminu${wykreslone ? ` <span class="maly-tekst">(bez ${formatDni(wykreslone)} wykreślonych)</span>` : ''}`;
   const czasHtml = okresowe ? '–'
     : `${formatDni(szacowanyCzas(z))}${czasZTagu(z) === null ? ' <span class="maly-tekst">(domyślnie wg ważności)</span>' : ''}`
       + (zrobioneDni ? ` · zrobione: ${formatDni(zrobioneDni)}` : '');
@@ -552,6 +577,7 @@ function pokazSzczegoly(id) {
       <dt>Termin</dt><dd>${!z.termin ? 'bez terminu' : roznicaDni(DZIS, z.termin) > 1 ? esc(opisTerminu(z.termin)) : esc(ladnaData(z.termin)) + ' · ' + esc(opisTerminu(z.termin))}</dd>
       <dt>Ważność</dt><dd>${okresowe ? '<span class="znaczek">↻ zadanie okresowe – bez priorytetu</span>' : `<span class="znaczek w-${z.priorytet}">${NAZWA_PRIORYTETU[z.priorytet]}</span>`}</dd>
       <dt>Czas pracy</dt><dd>${czasHtml}</dd>
+      <dt>Dni na pracę</dt><dd>${dniNaPraceHtml}</dd>
       <dt>Intensywność</dt><dd>${z.wykonane || okresowe ? '–' : `<span class="znaczek ${p}">${NAZWA_POZIOMU[p]}</span> <span class="maly-tekst">${esc(opisWskaznika(z))}</span>`}</dd>
       <dt>Tagi</dt><dd>${widoczneTagi(z).length ? widoczneTagi(z).map(t => `<span class="znaczek tag">#${esc(t)}</span>`).join(' ') : '–'}</dd>
       <dt>Status</dt><dd>${z.wykonane ? '✓ Zrobione' : 'Do zrobienia'}</dd>
@@ -661,7 +687,8 @@ function htmlDniaKal(d, info, tryb, zakres) {
   const data = zISO(d);
   const przeszly = d < DZIS;
   const poza = tryb === 'miesiac' && data.getMonth() !== zakres.miesiac;
-  const klasy = ['dzien-kal', d === DZIS && 'dzisiaj', przeszly && 'przeszly', poza && 'poza'].filter(Boolean).join(' ');
+  const wolny = czyWolny(d);
+  const klasy = ['dzien-kal', d === DZIS && 'dzisiaj', przeszly && 'przeszly', poza && 'poza', wolny && 'wolny'].filter(Boolean).join(' ');
 
   let naglowek;
   if (tryb === 'tydzien') {
@@ -687,9 +714,12 @@ function htmlDniaKal(d, info, tryb, zakres) {
   const dodaj = tryb === 'miesiac' || przeszly ? ''
     : `<button class="dodaj-w-dniu" data-akcja="nowe" data-data="${d}" title="Dodaj zadanie na ten dzień">${tryb === 'tydzien' ? '+ Dodaj' : '+'}</button>`;
 
+  const powod = wolny ? `<span class="wolny-powod" title="Dzień wykreślony: ${esc(wolne[d] || 'wolne')}">✕ ${esc(wolne[d] || 'wolne')}</span>` : '';
+  // kliknięcie w puste miejsce dnia (od dziś) otwiera okno wykreślania
   return `
-    <div class="${klasy}">
+    <div class="${klasy}" ${przeszly ? '' : `data-dzien="${d}"`} ${przeszly ? '' : 'title="Kliknij, aby wykreślić dzień (np. wakacje)"'}>
       <div class="kal-gora">${naglowek}</div>
+      ${powod}
       ${srodek}
       ${dodaj}
     </div>`;
@@ -728,8 +758,8 @@ function widokTerminarz() {
   const legenda = tryb === 'miesiac'
     ? `<span class="legenda">${POZIOMY.map(p => `<i class="kropka-kal ${p.klucz}"></i> ${p.nazwa.toLowerCase()}`).join(' ')}
        <i class="kropka-kal okresowe"></i> okresowe
-       ${terminarz.pokazSesje ? '<i class="kropka-kal sesja"></i> dzień pracy' : ''}</span> Kliknij kropkę lub kwadrat, aby zobaczyć zadanie.`
-    : 'Kolor paska = intensywność (niebieski luz → czerwony krytyczne, szary ↻ = okresowe), !!! / !! / ! = ważność. Kliknij zadanie, aby zobaczyć szczegóły, a kółko – aby je odhaczyć. Dni pracy są w przerywanej ramce.';
+       ${terminarz.pokazSesje ? '<i class="kropka-kal sesja"></i> dzień pracy' : ''}</span> Kliknij kropkę lub kwadrat, aby zobaczyć zadanie, a puste miejsce w dniu – aby go wykreślić (np. wakacje).`
+    : 'Kolor paska = intensywność (zielony luz → fioletowy krytyczne, szary ↻ = okresowe), !!! / !! / ! = ważność. Kliknij zadanie, aby zobaczyć szczegóły, a kółko – aby je odhaczyć. Dni pracy są w przerywanej ramce. Kliknij puste miejsce w dniu, aby go wykreślić (np. wakacje) – plan się wtedy ściśnie.';
   const bezTerminu = dane.zadania.filter(z => !z.wykonane && !z.termin).length;
 
   return pasekNarzedzi + naglowkiDni +
@@ -1083,6 +1113,68 @@ formularz.addEventListener('submit', e => {
 });
 
 /* =====================================================================
+   Okno dnia: wykreślanie dni (wakacje, wyjazd, choroba...)
+   Wykreślone dni nie liczą się do czasu na pracę, więc plan się kompresuje.
+   Zapisujemy je w przeglądarce (plik JSON zostaje w niezmienionym formacie).
+   ===================================================================== */
+const oknoDnia = document.getElementById('okno-dnia');
+const formDnia = document.getElementById('form-dnia');
+
+function otworzOknoDnia(data) {
+  formDnia.dataset.data = data;
+  const wolny = czyWolny(data);
+  document.getElementById('dzien-tytul').textContent =
+    zISO(data).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+  formDnia.powod.value = wolny ? wolne[data] : '';
+  formDnia.doDnia.value = '';
+  formDnia.doDnia.min = data;
+  document.getElementById('dzien-info').innerHTML = wolny
+    ? `Ten dzień jest wykreślony: <b>${esc(wolne[data] || 'wolne')}</b>. Możesz zmienić powód albo go przywrócić.`
+    : 'Wykreślony dzień nie liczy się do czasu na pracę – dni pracy przesuną się na pozostałe dni, a intensywność zadań odpowiednio wzrośnie.';
+  document.getElementById('dzien-przywroc').hidden = !wolny;
+  document.getElementById('dzien-przywroc').dataset.data = data;
+  document.getElementById('dzien-zapisz').textContent = wolny ? 'Zapisz' : 'Wykreśl dzień';
+  oknoDnia.showModal();
+  formDnia.powod.focus();
+}
+
+formDnia.addEventListener('submit', e => {
+  e.preventDefault();
+  const od = formDnia.dataset.data;
+  const doDnia = poprawnaData(formDnia.doDnia.value) && formDnia.doDnia.value >= od ? formDnia.doDnia.value : od;
+  const powod = formDnia.powod.value.trim() || 'wolne';
+  const ile = roznicaDni(od, doDnia) + 1;
+  for (let i = 0; i < ile; i++) wolne[dodajDni(od, i)] = powod;
+  zapiszLokalnie();
+  oknoDnia.close();
+  odswiez();
+  powiadom(ile === 1 ? `Wykreślono ${ladnaData(od)} (${powod}).` : `Wykreślono ${ile} dni (${powod}).`, 'Cofnij', () => {
+    for (let i = 0; i < ile; i++) delete wolne[dodajDni(od, i)];
+    zapiszLokalnie();
+    odswiez();
+  });
+});
+
+function przywrocDni(data) {
+  // przywracamy cały ciągły blok dni z tym samym powodem (np. całe wakacje)
+  const powod = wolne[data];
+  let od = data, doDnia = data;
+  while (wolne[dodajDni(od, -1)] === powod) od = dodajDni(od, -1);
+  while (wolne[dodajDni(doDnia, 1)] === powod) doDnia = dodajDni(doDnia, 1);
+  const ile = roznicaDni(od, doDnia) + 1;
+  const kopia = {};
+  for (let i = 0; i < ile; i++) { const d = dodajDni(od, i); kopia[d] = wolne[d]; delete wolne[d]; }
+  zapiszLokalnie();
+  oknoDnia.close();
+  odswiez();
+  powiadom(ile === 1 ? `Przywrócono ${ladnaData(data)}.` : `Przywrócono ${ile} dni (${powod}).`, 'Cofnij', () => {
+    Object.assign(wolne, kopia);
+    zapiszLokalnie();
+    odswiez();
+  });
+}
+
+/* =====================================================================
    Powiadomienia (z przyciskiem "Cofnij")
    ===================================================================== */
 function powiadom(tekst, przycisk = null, akcja = null) {
@@ -1106,7 +1198,11 @@ function powiadom(tekst, przycisk = null, akcja = null) {
    ===================================================================== */
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-akcja], [data-widok]');
-  if (!el) return;
+  if (!el) {
+    const dzien = e.target.closest('.dzien-kal[data-dzien]');
+    if (dzien && tresc.contains(dzien)) otworzOknoDnia(dzien.dataset.dzien);
+    return;
+  }
   if (el.dataset.widok) {
     widok = el.dataset.widok;
     odswiez();
@@ -1132,6 +1228,8 @@ document.addEventListener('click', e => {
     case 'wczytaj': document.getElementById('plik').click(); break;
     case 'zapisz': zapiszDoPliku(); break;
     case 'anuluj': okno.close(); break;
+    case 'zamknij-dzien': oknoDnia.close(); break;
+    case 'przywroc-dzien': przywrocDni(el.dataset.data); break;
   }
 });
 
