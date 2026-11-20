@@ -1041,3 +1041,11 @@ body {
   .dzien-kal { transition: none; }
   .dzien-kal[data-dzien]:hover { transform: none; }
 }
+
+/* ----- Zaległe: w dniu terminu "nie zrobione", a dziś półprzezroczysta kopia ----- */
+.karta.zalegla-kopia { opacity: .55; border-style: dashed; border-left-style: solid; }
+.karta.zalegla-kopia:hover { opacity: 1; }
+.karta.niezrobione { box-shadow: 0 0 0 1px color-mix(in srgb, var(--i-krytyczne) 35%, transparent); }
+.kropka-kal.zalegla-kopia { opacity: .45; outline: 1.5px dashed currentColor; outline-offset: 1px; }
+.dzien-kal.przeszly .karta { opacity: .9; }
+.karta .znaczek { white-space: normal; line-height: 1.35; padding: 1px 6px; }

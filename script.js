@@ -903,12 +903,14 @@ function zakresTerminarza() {
 /** Terminy i dni pracy dla każdego dnia w zakresie. */
 function daneKalendarza(start, dni) {
   const mapa = {};
-  for (let i = 0; i < dni; i++) mapa[dodajDni(start, i)] = { terminy: [], sesje: [] };
+  for (let i = 0; i < dni; i++) mapa[dodajDni(start, i)] = { terminy: [], sesje: [], zalegle: [] };
   for (const z of dane.zadania) {
     if (z.wykonane) continue;
     if (z.termin) {
-      const dzien = z.termin < DZIS ? DZIS : z.termin;   // zaległe pokazujemy dziś
-      if (mapa[dzien]) mapa[dzien].terminy.push(z);
+      // zadanie zawsze w dniu swojego terminu (także minionym – tam widać, że było do zrobienia)…
+      if (mapa[z.termin]) mapa[z.termin].terminy.push(z);
+      // …a jeśli jest zaległe, dziś pokazujemy jego półprzezroczystą "kopię" z odnośnikiem do tamtego dnia
+      if (z.termin < DZIS && mapa[DZIS]) mapa[DZIS].zalegle.push(z);
     }
     const plan = planSesji(z);
     for (const s of plan) {
@@ -922,19 +924,33 @@ function daneKalendarza(start, dni) {
   }
   for (const info of Object.values(mapa)) {
     info.terminy.sort((a, b) => (WAGA_PRIORYTETU[b.priorytet] - WAGA_PRIORYTETU[a.priorytet]) || porownajTermin(a, b));
+    info.zalegle.sort(porownajTermin);
     info.sesje.sort((a, b) => (a.zrobiona ? 1 : 0) - (b.zrobiona ? 1 : 0));
   }
   return mapa;
 }
 
 function htmlTerminuKal(z) {
-  const zalegle = z.termin < DZIS;
+  const zalegle = z.termin < DZIS;   // w dniu terminu, który już minął
   return `
-    <li class="karta ${klasaKoloru(z)}">
+    <li class="karta ${klasaKoloru(z)} ${zalegle ? 'niezrobione' : ''}">
       <button class="odhacz maly-odhacz" data-akcja="odhacz" data-id="${z.id}" title="Oznacz jako zrobione" aria-label="Oznacz jako zrobione"></button>
       <button class="karta-tresc" data-akcja="szczegoly" data-id="${z.id}" title="Pokaż szczegóły">
         <span class="karta-tytul">${znacznikWaznosci(z)}${esc(z.tytul)}</span>
-        ${zalegle ? `<span class="znaczek krytyczne">zaległe · ${esc(ladnaData(z.termin, false))}</span>` : ''}
+        ${zalegle ? '<span class="znaczek krytyczne">⚠ nie zrobione w terminie</span>' : ''}
+      </button>
+    </li>`;
+}
+
+/** Zaległe zadanie pokazane DZIŚ – półprzezroczysta kopia, wiadomo, że to to samo zadanie. */
+function htmlZaleglegoKal(z) {
+  const dni = roznicaDni(z.termin, DZIS);
+  return `
+    <li class="karta ${klasaKoloru(z)} zalegla-kopia" title="To samo zadanie co ${esc(ladnaData(z.termin))} – jeszcze nie zrobione">
+      <button class="odhacz maly-odhacz" data-akcja="odhacz" data-id="${z.id}" title="Oznacz jako zrobione" aria-label="Oznacz jako zrobione"></button>
+      <button class="karta-tresc" data-akcja="szczegoly" data-id="${z.id}" title="Pokaż szczegóły">
+        <span class="karta-tytul">${znacznikWaznosci(z)}${esc(z.tytul)}</span>
+        <span class="znaczek krytyczne">↪ zaległe z ${esc(ladnaData(z.termin, false))} · ${dni} ${dni === 1 ? 'dzień' : 'dni'} temu</span>
       </button>
     </li>`;
 }
@@ -958,6 +974,10 @@ function htmlKropek(info) {
     const p = poziom(z);
     return `<button class="kropka-kal ${p}" data-akcja="szczegoly" data-id="${z.id}"
       title="${esc(z.tytul)} (${NAZWA_POZIOMU[p].toLowerCase()})" aria-label="${esc(z.tytul)}">${p === 'akcja' ? '🛴' : ''}</button>`;
+  }).join('') + info.zalegle.map(z => {
+    const p = poziom(z);
+    return `<button class="kropka-kal ${p} zalegla-kopia" data-akcja="szczegoly" data-id="${z.id}"
+      title="Zaległe z ${esc(ladnaData(z.termin))}: ${esc(z.tytul)}" aria-label="Zaległe: ${esc(z.tytul)}">${p === 'akcja' ? '🛴' : ''}</button>`;
   }).join('');
   // 2. rząd: dni pracy – małe kółka, żeby nie zasłaniały terminów
   const praca = terminarz.pokazSesje ? info.sesje.map(s =>
@@ -988,6 +1008,7 @@ function htmlDniaKal(d, info, tryb, zakres) {
     srodek = htmlKropek(info);
   } else {
     const pozycje = [
+      ...info.zalegle.map(htmlZaleglegoKal),
       ...info.terminy.map(htmlTerminuKal),
       ...(terminarz.pokazSesje ? info.sesje.map(htmlSesjiKal) : []),
     ];
