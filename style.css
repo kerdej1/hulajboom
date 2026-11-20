@@ -726,3 +726,27 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .wartosc-jednostka { display: flex; gap: 4px; }
 .wartosc-jednostka input { min-width: 0; flex: 1; }
 .wartosc-jednostka select { width: auto; flex: none; }
+
+/* ----- Uwagi pod wykrzyknikiem ----- */
+.uwaga {
+  position: relative;
+  display: inline-grid; place-items: center;
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--i-pora); color: #fff;
+  font-size: 12px; font-weight: 800; cursor: help;
+  vertical-align: middle; margin-left: 4px;
+}
+.uwaga.powazna { background: var(--i-pilne); }
+.uwaga-dymek {
+  display: none;
+  position: absolute; z-index: 40;
+  bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  width: max-content; max-width: 280px;
+  background: #1f2328; color: #fff; text-align: left;
+  font-size: 12px; font-weight: 400; line-height: 1.4;
+  padding: 8px 10px; border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0,0,0,.2);
+}
+.uwaga-dymek span { display: block; }
+.uwaga-dymek span + span { margin-top: 6px; }
+.uwaga:hover .uwaga-dymek, .uwaga:focus .uwaga-dymek { display: block; }
