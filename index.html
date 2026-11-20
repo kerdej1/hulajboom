@@ -17,6 +17,7 @@
         </div>
       </div>
       <div class="akcje">
+        <button class="przycisk" data-akcja="profil" title="Zmień swój styl pracy (ile godzin to dzień pracy)">⚙ Mój styl pracy</button>
         <button class="przycisk" data-akcja="wczytaj" title="Wczytaj zadania z pliku JSON">Wczytaj JSON</button>
         <button class="przycisk" data-akcja="zapisz" title="Zapisz zadania do pliku JSON">Zapisz JSON</button>
         <button class="przycisk glowny" data-akcja="nowe">+ Nowe zadanie</button>
@@ -118,6 +119,11 @@
         <button type="submit" id="dzien-zapisz" class="przycisk glowny">Wykreśl dzień</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Styl pracy (pytanie przy pierwszym wejściu) -->
+  <dialog id="okno-profil" class="okno okno-profil">
+    <div id="profil-tresc" class="profil-tresc"></div>
   </dialog>
 
   <input type="file" id="plik" accept=".json,application/json" hidden>

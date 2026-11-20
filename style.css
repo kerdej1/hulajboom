@@ -750,3 +750,30 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .uwaga-dymek span { display: block; }
 .uwaga-dymek span + span { margin-top: 6px; }
 .uwaga:hover .uwaga-dymek, .uwaga:focus .uwaga-dymek { display: block; }
+
+/* ----- Styl pracy (pierwsze wejście) ----- */
+.okno-profil { width: min(720px, 94vw); }
+.profil-tresc { padding: 22px; display: grid; gap: 14px; }
+.profil-tresc h2 { margin: 0; font-size: 19px; }
+.profil-tresc p { margin: 0; }
+.style-wybor { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.styl-przycisk, .tabela-profil {
+  border: 1px solid var(--linia); background: #fff; border-radius: 12px;
+  padding: 14px; text-align: left; display: flex; flex-direction: column; gap: 6px;
+  transition: border-color .15s, box-shadow .15s, transform .1s;
+}
+.styl-przycisk:hover, .tabela-profil:hover { border-color: var(--akcent); box-shadow: 0 4px 14px rgba(59,91,219,.12); transform: translateY(-1px); }
+.tabele-profil { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.tabela-naglowek { font-weight: 700; color: var(--akcent); }
+.tabela-profil table { border-collapse: collapse; width: 100%; font-size: 14px; }
+.tabela-profil td { padding: 4px 0; border-bottom: 1px solid var(--linia); }
+.tabela-profil td:last-child { text-align: right; }
+.wlasne-profil summary { cursor: pointer; color: var(--akcent); font-size: 14px; }
+.wlasne-pola { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 10px; align-items: end; margin-top: 10px; }
+.wlasne-pola .blad { grid-column: 1 / -1; }
+.wlasne-pola input { border: 1px solid var(--linia); border-radius: 8px; padding: 8px 10px; font: inherit; width: 100%; }
+@media (max-width: 600px) {
+  .style-wybor, .tabele-profil { grid-template-columns: 1fr; }
+  .wlasne-pola { grid-template-columns: 1fr 1fr 1fr; }
+  .wlasne-pola .przycisk { grid-column: 1 / -1; }
+}

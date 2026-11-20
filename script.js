@@ -17,7 +17,8 @@
 // ---------- Ustawienia ----------
 const KLUCZ_DANE = 'planner.dane.v2';     // zadania (ten sam format co plik JSON)
 const KLUCZ_SESJE = 'planner.sesje.v2';   // odhaczone dni pracy: { idZadania: [daty] }
-const KLUCZ_WOLNE = 'planner.wolne.v2';   // wykreślone dni (wakacje, wyjazd...): { data: powód }
+const KLUCZ_WOLNE = 'planner.wolne.v2';
+const KLUCZ_PROFIL = 'planner.profil.v2';   // styl pracy użytkownika: { styl, punkty }   // wykreślone dni (wakacje, wyjazd...): { data: powód }
 
 const PRIORYTETY = ['niski', 'sredni', 'wysoki'];
 const NAZWA_PRIORYTETU = { niski: 'Niski', sredni: 'Średni', wysoki: 'Wysoki' };
@@ -233,9 +234,14 @@ function zapiszLokalnie() {
     localStorage.setItem(KLUCZ_DANE, JSON.stringify(dane));
     localStorage.setItem(KLUCZ_SESJE, JSON.stringify(sesje));
     localStorage.setItem(KLUCZ_WOLNE, JSON.stringify(wolne));
+    if (profil) localStorage.setItem(KLUCZ_PROFIL, JSON.stringify(profil));
   } catch (e) { /* np. tryb prywatny – aplikacja działa dalej, tylko bez autozapisu */ }
 }
 function wczytajLokalnie() {
+  try {
+    const pr = JSON.parse(localStorage.getItem(KLUCZ_PROFIL) || 'null');
+    profil = pr && poprawnePunkty(pr.punkty) ? pr : null;
+  } catch (e) { profil = null; }
   try {
     const w = JSON.parse(localStorage.getItem(KLUCZ_WOLNE) || '{}');
     wolne = w && typeof w === 'object' && !Array.isArray(w) ? w : {};
@@ -301,22 +307,35 @@ function szacowanyCzas(z) {
   return czasZTagu(z) ?? (DOMYSLNY_CZAS[z.priorytet] || 1);
 }
 
-/* ---------- Godziny pracy ----------
+/* ---------- Godziny pracy (dopasowane do użytkownika) ----------
    Szacowany czas x (dni) = ile dni potrzeba, żeby zrobić zadanie SPOKOJNIE.
-   Spokojne tempo = sesja ok. 3 h co ok. 2,4 dnia (czyli co 2–3 dni),
-   Ile to czystej pracy? Krótkie zadania są bardziej "gęste" niż długie:
-   3 dni ≈ 2,5 h/dzień (≈ 7,5 h), 30 dni ≈ 1,25 h/dzień (≈ 37,5 h).
-   Dopasowana krzywa potęgowa przez te dwa punkty:
-       godziny(x) = A · x^K,  K = 1 + log10(1,25 / 2,5) ≈ 0,699,  A = 7,5 / 3^K ≈ 3,48
-   Rośnie wolniej niż liniowo: 1 dzień ≈ 3,5 h, 10 dni ≈ 17 h, 60 dni ≈ 61 h. */
+   Ile to godzin czystej pracy – zależy od człowieka. Przy pierwszym wejściu
+   pytamy o styl pracy i dajemy do wyboru tabelki z trzema punktami:
+   ile godzin to 1 dzień, 3 dni i 30 dni. Przez te punkty prowadzimy krzywą
+   (odcinkami prostymi w skali logarytmicznej, czyli kawałkami krzywej potęgowej):
+   przechodzi dokładnie przez wybrane wartości, a poza nimi zachowuje nachylenie.
+   Dzięki temu krótkie zadania mogą być "gęstsze" niż długie – albo odwrotnie. */
 const SESJA_SPOKOJNA_H = 3;          // długość sesji przy spokojnym tempie
 const ODSTEP_SPOKOJNY = 2.4;         // co ile dni sesja przy spokojnym tempie
-const KRZYWA_K = 1 + Math.log10(1.25 / 2.5);          // ≈ 0,699
-const KRZYWA_A = 7.5 / Math.pow(3, KRZYWA_K);          // ≈ 3,48
+const PUNKTY_DNI = [1, 3, 30];
+const DOMYSLNE_PUNKTY = [3.5, 7.5, 37.5];   // zanim użytkownik wybierze swój styl
+let profil = null;                           // { styl, punkty: [h1, h3, h30] }
+
+function punktyProfilu() {
+  return profil && Array.isArray(profil.punkty) ? profil.punkty : DOMYSLNE_PUNKTY;
+}
+function interpolujLog(v, X, Y) {
+  const lv = Math.log(v);
+  const lx = X.map(Math.log), ly = Y.map(Math.log);
+  const i = lv <= lx[1] ? 0 : 1;
+  const t = (lv - lx[i]) / (lx[i + 1] - lx[i]);
+  return Math.exp(ly[i] + t * (ly[i + 1] - ly[i]));
+}
 /** Szacowany czas (dni spokojnego planu) → godziny czystej pracy. */
-function godzinyZDni(x) { return x > 0 ? KRZYWA_A * Math.pow(x, KRZYWA_K) : 0; }
+function godzinyZDni(x) { return x > 0 ? interpolujLog(x, PUNKTY_DNI, punktyProfilu()) : 0; }
 /** Odwrotnie: godziny pracy → ile dni spokojnego planu to odpowiada. */
-function dniZGodzin(h) { return h > 0 ? Math.pow(h / KRZYWA_A, 1 / KRZYWA_K) : 0; }
+function dniZGodzin(h) { return h > 0 ? interpolujLog(h, punktyProfilu(), PUNKTY_DNI) : 0; }
+
 // Limity oparte na badaniach:
 // – Ericsson, Krampe i Tesch-Römer (1993): przy wymagającej pracy umysłowej korzyści maleją
 //   powyżej ok. 2 h, a powyżej ok. 4 h dziennie praktycznie znikają → max 4 h dziennie na zadanie.
@@ -1185,6 +1204,113 @@ function przywrocDni(data) {
 }
 
 /* =====================================================================
+   STYL PRACY – pytamy przy pierwszym wejściu
+   1) Jaką pracę lubisz: mało intensywną, intensywną, bardzo intensywną?
+   2) Wybierz tabelkę, która najlepiej do Ciebie pasuje (albo wpisz własne liczby).
+   Z wybranych punktów aplikacja buduje swoją funkcję "dni → godziny pracy".
+   ===================================================================== */
+const STYLE = {
+  malo: {
+    nazwa: 'Mało intensywna',
+    opis: 'Wolę pracować po trochu, bez długich posiedzeń.',
+    tabele: [[1.5, 4, 20], [2, 5, 25], [2, 6, 30]],
+  },
+  intensywna: {
+    nazwa: 'Intensywna',
+    opis: 'Lubię porządnie usiąść do pracy, ale z rozsądkiem.',
+    tabele: [[3.5, 7.5, 37.5], [2, 10, 40], [4, 15, 100]],
+  },
+  bardzo: {
+    nazwa: 'Bardzo intensywna',
+    opis: 'Najlepiej idzie mi, gdy pracuję dużo i długo.',
+    tabele: [[4, 16, 110], [5, 18, 130], [6, 22, 160]],
+  },
+};
+const oknoProfil = document.getElementById('okno-profil');
+let krokProfilu = { styl: null };
+
+function poprawnePunkty(p) {
+  return Array.isArray(p) && p.length === 3 && p.every(v => typeof v === 'number' && v > 0)
+    && p[0] < p[1] && p[1] < p[2];
+}
+function formatH(v) { return String(Math.round(v * 10) / 10).replace('.', ','); }
+
+function htmlTabeli(punkty, i) {
+  const wiersze = PUNKTY_DNI.map((d, k) => `<tr><td>${d === 1 ? '1 dzień' : d + ' dni'}</td><td><b>${formatH(punkty[k])} h</b></td></tr>`).join('');
+  return `
+    <button type="button" class="tabela-profil" data-akcja="wybierz-tabele" data-nr="${i}">
+      <span class="tabela-naglowek">Wariant ${i + 1}</span>
+      <table>${wiersze}</table>
+      <span class="maly-tekst">np. 10 dni ≈ ${formatH(interpolujLog(10, PUNKTY_DNI, punkty))} h pracy</span>
+    </button>`;
+}
+
+function rysujProfil() {
+  const el = document.getElementById('profil-tresc');
+  if (!krokProfilu.styl) {
+    el.innerHTML = `
+      <h2>Dopasujmy plan do Ciebie</h2>
+      <p class="maly-tekst">Szacujesz zadania w dniach (np. „kolokwium – 3 dni”). Żeby wiedzieć, ile to godzin czystej pracy,
+        musimy wiedzieć, jak lubisz pracować. Jaką pracę lubisz?</p>
+      <div class="style-wybor">
+        ${Object.entries(STYLE).map(([k, s]) => `
+          <button type="button" class="styl-przycisk" data-akcja="wybierz-styl" data-styl="${k}">
+            <b>${s.nazwa}</b><span class="maly-tekst">${s.opis}</span>
+          </button>`).join('')}
+      </div>
+      <div class="okno-stopka">
+        <button type="button" class="przycisk" data-akcja="pomin-profil">Pomiń – użyj ustawień domyślnych</button>
+      </div>`;
+    return;
+  }
+  const styl = STYLE[krokProfilu.styl];
+  const wlasne = profil && profil.styl === 'wlasne' ? profil.punkty : punktyProfilu();
+  el.innerHTML = `
+    <h2>${styl.nazwa} – która tabelka pasuje do Ciebie?</h2>
+    <p class="maly-tekst">Ile godzin czystej pracy to dla Ciebie zadanie oszacowane na 1 dzień, 3 dni i 30 dni?</p>
+    <div class="tabele-profil">${styl.tabele.map(htmlTabeli).join('')}</div>
+    <details class="wlasne-profil">
+      <summary>Żadna nie pasuje – wpiszę własne liczby</summary>
+      <form id="form-profil" class="wlasne-pola">
+        ${PUNKTY_DNI.map((d, k) => `<label class="pole"><span>${d === 1 ? '1 dzień' : d + ' dni'} = ile h?</span>
+          <input name="p${k}" type="number" min="0.1" step="0.1" value="${formatH(wlasne[k]).replace(',', '.')}"></label>`).join('')}
+        <button type="submit" class="przycisk glowny">Zapisz własne</button>
+        <small class="blad" id="blad-profil"></small>
+      </form>
+    </details>
+    <div class="okno-stopka">
+      <button type="button" class="przycisk" data-akcja="wstecz-profil">← Wstecz</button>
+    </div>`;
+}
+
+function otworzProfil() {
+  krokProfilu = { styl: null };
+  rysujProfil();
+  if (!oknoProfil.open) oknoProfil.showModal();
+}
+function zapiszProfil(styl, punkty) {
+  profil = { styl, punkty };
+  zapiszLokalnie();
+  oknoProfil.close();
+  odswiez();
+  powiadom(`Zapisano Twój styl pracy: 1 dzień ≈ ${formatH(punkty[0])} h, 3 dni ≈ ${formatH(punkty[1])} h, 30 dni ≈ ${formatH(punkty[2])} h.`);
+}
+
+oknoProfil.addEventListener('submit', e => {
+  if (e.target.id !== 'form-profil') return;
+  e.preventDefault();
+  const f = new FormData(e.target);
+  const punkty = [0, 1, 2].map(k => parseFloat(String(f.get('p' + k)).replace(',', '.')));
+  if (!poprawnePunkty(punkty)) {
+    document.getElementById('blad-profil').textContent = 'Podaj liczby większe od zera, rosnące: 1 dzień < 3 dni < 30 dni.';
+    return;
+  }
+  zapiszProfil('wlasne', punkty);
+});
+// okna nie da się zamknąć klawiszem Esc przy pierwszym wejściu bez wyboru – wtedy liczymy jak "Pomiń"
+oknoProfil.addEventListener('cancel', () => { if (!profil) { profil = { styl: 'domyslne', punkty: DOMYSLNE_PUNKTY.slice() }; zapiszLokalnie(); } });
+
+/* =====================================================================
    Powiadomienia (z przyciskiem "Cofnij")
    ===================================================================== */
 function powiadom(tekst, przycisk = null, akcja = null) {
@@ -1237,6 +1363,11 @@ document.addEventListener('click', e => {
     case 'zapisz': zapiszDoPliku(); break;
     case 'anuluj': okno.close(); break;
     case 'zamknij-dzien': oknoDnia.close(); break;
+    case 'profil': otworzProfil(); break;
+    case 'wybierz-styl': krokProfilu.styl = el.dataset.styl; rysujProfil(); break;
+    case 'wstecz-profil': krokProfilu.styl = null; rysujProfil(); break;
+    case 'wybierz-tabele': zapiszProfil(krokProfilu.styl, STYLE[krokProfilu.styl].tabele[Number(el.dataset.nr)].slice()); break;
+    case 'pomin-profil': zapiszProfil('domyslne', DOMYSLNE_PUNKTY.slice()); break;
     case 'przywroc-dzien': przywrocDni(el.dataset.data); break;
   }
 });
@@ -1292,3 +1423,4 @@ if (!wczytajLokalnie() && window.PRZYKLADOWE_DANE) {
   zapiszLokalnie();
 }
 odswiez();
+if (!profil) otworzProfil();   // pierwsze wejście – pytamy o styl pracy
