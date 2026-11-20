@@ -13,6 +13,13 @@
   --pilne: #e03131;
   --wkrotce: #e8890c;
   --spokojnie: #2b8a3e;
+  /* 5 poziomów intensywności: niebieski → zielony → żółty → pomarańczowy → czerwony */
+  --i-luz: #1c7ed6;
+  --i-spokojnie: #2f9e44;
+  --i-pora: #f0b400;
+  --i-pilne: #f76707;
+  --i-krytyczne: #e03131;
+  --i-okresowe: #adb5bd;
   --promien: 10px;
 }
 
@@ -247,9 +254,13 @@ h1 { font-size: 18px; margin: 0; }
   white-space: nowrap;
 }
 .znaczek.tag { background: var(--akcent-jasny); color: var(--akcent); }
-.znaczek.pilne { background: #fff0f0; color: var(--pilne); }
-.znaczek.wkrotce { background: #fff4e6; color: var(--wkrotce); }
-.znaczek.spokojnie { background: #ebfbee; color: var(--spokojnie); }
+.znaczek.luz { background: #e7f5ff; color: var(--i-luz); }
+.znaczek.spokojnie { background: #ebfbee; color: var(--i-spokojnie); }
+.znaczek.pora { background: #fff9db; color: #a07800; }
+.znaczek.pilne { background: #fff4e6; color: var(--i-pilne); }
+.znaczek.krytyczne { background: #fff0f0; color: var(--i-krytyczne); }
+.tekst-luz { color: var(--i-luz); } .tekst-spokojnie { color: var(--i-spokojnie); } .tekst-pora { color: #a07800; }
+.tekst-pilne { color: var(--i-pilne); } .tekst-krytyczne { color: var(--i-krytyczne); }
 .znaczek.w-wysoki { color: var(--wysoki); }
 .znaczek.w-sredni { color: var(--sredni); }
 .znaczek.w-niski { color: var(--niski); }
@@ -342,9 +353,13 @@ h1 { font-size: 18px; margin: 0; }
   transition: transform .1s;
 }
 button.kropka-kal:hover { transform: scale(1.35); }
-.kropka-kal.pilne { background: var(--pilne); }
-.kropka-kal.wkrotce { background: var(--wkrotce); }
-.kropka-kal.spokojnie { background: var(--spokojnie); }
+.kropka-kal.luz { background: var(--i-luz); }
+.kropka-kal.spokojnie { background: var(--i-spokojnie); }
+.kropka-kal.pora { background: var(--i-pora); }
+.kropka-kal.pilne { background: var(--i-pilne); }
+.kropka-kal.krytyczne { background: var(--i-krytyczne); }
+/* zadania okresowe: bez koloru i jako kwadrat zamiast kropki */
+.kropka-kal.okresowe { background: var(--i-okresowe); border-radius: 2px; }
 .kropka-kal.sesja { background: #fff; border: 2px solid var(--akcent); }
 .kropka-kal.sesja.zrobiona { background: var(--akcent); }
 .legenda { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; }
@@ -413,8 +428,7 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .przelacznik button.wl { background: var(--akcent-jasny); color: var(--akcent); font-weight: 600; }
 .pokaz-zrobione { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--szary); cursor: pointer; padding: 0 4px; }
 
-.tablica { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
-.tablica.cztery { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.tablica { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(190px, 1fr); gap: 10px; align-items: start; overflow-x: auto; padding-bottom: 6px; }
 .kol {
   background: #efefec;
   border-radius: var(--promien);
@@ -424,9 +438,15 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .kol-gora { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .kol-nazwa { font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 7px; }
 .kol-nazwa::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: #b0b0aa; }
-.kol-pilne .kol-nazwa::before, .kol-wysoki .kol-nazwa::before { background: var(--pilne); }
-.kol-wkrotce .kol-nazwa::before, .kol-sredni .kol-nazwa::before { background: var(--wkrotce); }
-.kol-spokojnie .kol-nazwa::before, .kol-niski .kol-nazwa::before { background: var(--spokojnie); }
+.kol-wysoki .kol-nazwa::before { background: var(--wysoki); }
+.kol-sredni .kol-nazwa::before { background: var(--sredni); }
+.kol-niski .kol-nazwa::before { background: var(--niski); }
+.kol-luz .kol-nazwa::before { background: var(--i-luz); }
+.kol-spokojnie .kol-nazwa::before { background: var(--i-spokojnie); }
+.kol-pora .kol-nazwa::before { background: var(--i-pora); }
+.kol-pilne .kol-nazwa::before { background: var(--i-pilne); }
+.kol-krytyczne .kol-nazwa::before { background: var(--i-krytyczne); }
+.kol-okresowe .kol-nazwa::before { background: var(--i-okresowe); border-radius: 2px; }
 .kol-opis { font-size: 12px; color: var(--szary); margin: 2px 0 10px; }
 .kafelki { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .kafelek {
@@ -451,7 +471,11 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .kafelek.zrobiony .kafelek-tytul { text-decoration: line-through; }
 .kafelek-tytul { font-weight: 600; font-size: 14px; line-height: 1.3; overflow-wrap: break-word; hyphens: auto; }
 .kafelek-podtytul { font-size: 12px; color: var(--szary); }
-.kafelek-podtytul.pilne { color: var(--pilne); }
+.kafelek-podtytul.pilne { color: var(--i-pilne); }
+.kafelek-podtytul.krytyczne { color: var(--i-krytyczne); font-weight: 600; }
+.kafelek-podtytul.pora { color: #a07800; }
+.kafelek.p-brak, .karta.p-brak { border-left-color: var(--i-okresowe); }
+.ikona-okres { color: var(--szary); font-weight: 700; }
 
 /* ----- Okno szczegółów ----- */
 .szcz { padding: 20px; display: grid; gap: 12px; }
@@ -549,7 +573,7 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .okno h2 { margin: 0; font-size: 18px; }
 .pole { display: grid; gap: 5px; border: none; padding: 0; margin: 0; min-width: 0; }
 .pole > span, .pole legend { font-size: 13px; font-weight: 600; color: var(--szary); padding: 0; margin-bottom: 5px; }
-.pole input[type="text"], .pole input[type="date"], .pole textarea {
+.pole input[type="text"], .pole input[type="date"], .pole input[type="number"], .pole textarea {
   border: 1px solid var(--linia);
   border-radius: 8px;
   padding: 8px 10px;
@@ -626,7 +650,7 @@ button.kropka-kal:hover { transform: scale(1.35); }
 
 /* ----- Tablet: tydzień przewijany w bok ----- */
 @media (max-width: 860px) {
-  .tablica, .tablica.cztery { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 260px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
+  .tablica { grid-auto-columns: 240px; scroll-snap-type: x mandatory; }
   .kol { scroll-snap-align: start; }
   .tydzien { grid-template-columns: repeat(7, 150px); overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x mandatory; }
   .kolumna { scroll-snap-align: start; }
@@ -660,3 +684,9 @@ button.kropka-kal:hover { transform: scale(1.35); }
   .zadanie-akcje { grid-column: 2; }
   .akcje .przycisk:not(.glowny) { font-size: 13px; padding: 6px 9px; }
 }
+
+/* ----- Formularz: czas pracy i zadanie okresowe ----- */
+.pole[hidden] { display: none; }
+.pole > span.checkbox-wiersz { font-weight: 400; color: var(--tekst); margin: 0; }
+.checkbox-wiersz { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 8px 0; cursor: pointer; }
+.przelacznik-okres > span:first-child { font-size: 13px; font-weight: 600; color: var(--szary); }

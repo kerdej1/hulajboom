@@ -4,12 +4,14 @@
    Planner studenta
    ---------------------------------------------------------------------
    Każde zadanie oceniamy na dwóch osiach:
-   1. WAŻNOŚĆ  – pole "priorytet" z pliku JSON (niski / sredni / wysoki),
-   2. PILNOŚĆ  – liczona automatycznie z liczby dni do terminu.
+   1. WAŻNOŚĆ – pole "priorytet" z pliku JSON (niski / sredni / wysoki),
+   2. INTENSYWNOŚĆ (5 poziomów) – ile potrzebnego czasu pracy zostało do terminu.
    Na tej podstawie aplikacja:
-   - rozkłada "sesje pracy" na dni przed terminem (wysoki 4, średni 2, niski 1),
+   - rozkłada dni pracy przed terminem (tyle, ile wynosi szacowany czas pracy),
    - liczy punkty obciążenia każdego dnia i ostrzega o przeciążeniu (> 5 pkt).
-   Format pliku JSON pozostaje nietknięty – nic nie dopisujemy do zadań.
+   Zadania okresowe (siłownia, zakupy...) nie mają priorytetu ani dni pracy.
+   Format pliku JSON pozostaje nietknięty – dodatkowe informacje (czas pracy,
+   zadanie okresowe) zapisujemy jako ukryte tagi, np. "⏱30d" i "okresowe".
    ===================================================================== */
 
 // ---------- Ustawienia ----------
@@ -20,19 +22,34 @@ const PRIORYTETY = ['niski', 'sredni', 'wysoki'];
 const NAZWA_PRIORYTETU = { niski: 'Niski', sredni: 'Średni', wysoki: 'Wysoki' };
 const WAGA_PRIORYTETU = { niski: 1, sredni: 2, wysoki: 3 };
 
-const SESJE_NA_PRIORYTET = { wysoki: 4, sredni: 2, niski: 1 };
+// Szacowany czas pracy (w dniach), gdy użytkownik go nie podał – zależnie od ważności
+const DOMYSLNY_CZAS = { wysoki: 3, sredni: 2, niski: 1 };
 const PUNKTY_ZA_TERMIN = { wysoki: 3, sredni: 2, niski: 1 };
 const PUNKTY_ZA_SESJE = 1;
 const LIMIT_DNIA = 5;        // powyżej tej liczby punktów dzień jest przeciążony
 const HORYZONT_DNI = 14;     // ile dni do przodu planujemy i sprawdzamy
 
-const NAZWA_PILNOSCI = { pilne: 'Pilne', wkrotce: 'Wkrótce', spokojnie: 'Spokojnie' };
+// 5 poziomów intensywności. Liczymy, jaka część potrzebnego czasu pracy (x) została do terminu:
+// ≥ 100% x → Luz, potem co 23,3 punktu procentowego w dół.
+const POZIOMY = [
+  { klucz: 'luz', nazwa: 'Luz', od: 1.0 },
+  { klucz: 'spokojnie', nazwa: 'Spokojnie', od: 0.767 },
+  { klucz: 'pora', nazwa: 'Pora zaczynać', od: 0.534 },
+  { klucz: 'pilne', nazwa: 'Pilne', od: 0.301 },
+  { klucz: 'krytyczne', nazwa: 'Krytyczne', od: -Infinity },
+];
+const NAZWA_POZIOMU = Object.fromEntries(POZIOMY.map(p => [p.klucz, p.nazwa]));
+NAZWA_POZIOMU.okresowe = 'Okresowe';
+
+// Ukryte tagi – tak zapisujemy w JSON informacje, dla których format nie ma pól
+const TAG_OKRESOWE = 'okresowe';         // zadanie okresowe (siłownia, zakupy...) – bez priorytetu
+const ZNAK_CZASU = '⏱';                   // np. tag "⏱30d" = szacowany czas pracy 30 dni
 
 // ---------- Stan aplikacji ----------
 let dane = { wersja: 1, zadania: [] };
 let sesje = {};
 let widok = 'terminarz';   // widok startowy: kalendarz
-const filtry = { szukaj: '', tag: '', grupuj: 'pilnosc', pokazZrobione: false };
+const filtry = { szukaj: '', tag: '', grupuj: 'poziom', pokazZrobione: false };
 let szczegolyId = null;   // zadanie otwarte w oknie szczegółów
 let edytowaneId = null;
 
@@ -69,6 +86,22 @@ function roznicaDni(a, b) {
 function ladnaData(s, zDniem = true) {
   const opcje = zDniem ? { weekday: 'short', day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short' };
   return zISO(s).toLocaleDateString('pl-PL', opcje);
+}
+/** Lista dat dni pracy – długie plany skracamy, żeby nie zalały okna. */
+function listaDniPracy(plan, max = 8) {
+  const dni = plan.map(s => s.data === DZIS ? 'dziś' : ladnaData(s.data));
+  // kilka bloków w jednym dniu pokazujemy jako "pon., 23 lis ×2"
+  const zgrupowane = [];
+  for (const d of dni) {
+    const ost = zgrupowane[zgrupowane.length - 1];
+    if (ost && ost.d === d) ost.n++; else zgrupowane.push({ d, n: 1 });
+  }
+  const teksty = zgrupowane.map(x => x.n > 1 ? `${x.d} ×${x.n}` : x.d);
+  return teksty.length > max ? teksty.slice(0, max).join(' · ') + ` · … (+${teksty.length - max} dni)` : teksty.join(' · ');
+}
+function formatDni(n) {
+  const t = String(Math.round(n * 10) / 10).replace('.', ',');
+  return n === 1 ? '1 dzień' : `${t} dni`;
 }
 function opisTerminu(termin) {
   if (!termin) return 'bez terminu';
@@ -216,16 +249,61 @@ function wczytajLokalnie() {
 }
 
 /* =====================================================================
-   SMART: pilność, plan sesji pracy, obciążenie dni
+   SMART: czas pracy, 5 poziomów intensywności, plan dni pracy, obciążenie
+   ---------------------------------------------------------------------
+   Każde zadanie ma szacowany czas pracy x (w dniach) – tyle, ile trzeba,
+   żeby zrobić je SPOKOJNIE. Porównujemy go z czasem do terminu:
+       wskaźnik = dni do terminu ÷ pozostała praca
+   ≥ 1,0   → Luz (czasu jest tyle, ile trzeba, albo więcej)
+   ≥ 0,767 → Spokojnie
+   ≥ 0,534 → Pora zaczynać
+   ≥ 0,301 → Pilne
+   mniej   → Krytyczne (także po terminie)
+   Odhaczone dni pracy zmniejszają pozostałą pracę, więc gdy pracujesz
+   na bieżąco, poziom się nie pogarsza.
    ===================================================================== */
 
-/** Pilność liczona z liczby dni do terminu. */
-function pilnosc(z) {
-  if (!z.termin) return 'spokojnie';
-  const d = roznicaDni(DZIS, z.termin);
-  if (d <= 1) return 'pilne';
-  if (d <= 7) return 'wkrotce';
-  return 'spokojnie';
+/* ---------- Ukryte tagi ---------- */
+function czyOkresowe(z) { return z.tagi.includes(TAG_OKRESOWE); }
+function czyTagUkryty(t) { return t === TAG_OKRESOWE || t.startsWith(ZNAK_CZASU); }
+function widoczneTagi(z) { return z.tagi.filter(t => !czyTagUkryty(t)); }
+function czasZTagu(z) {
+  for (const t of z.tagi) {
+    const m = /^⏱\s*(\d+(?:[.,]\d+)?)\s*d$/.exec(t);
+    if (m) { const v = parseFloat(m[1].replace(',', '.')); if (v > 0) return v; }
+  }
+  return null;
+}
+function tagCzasu(dni) { return `${ZNAK_CZASU}${dni}d`; }
+
+/** Szacowany czas pracy w dniach (podany przez użytkownika albo domyślny). */
+function szacowanyCzas(z) {
+  return czasZTagu(z) ?? (czyPowtorka(z) ? 1 : DOMYSLNY_CZAS[z.priorytet] || 1);
+}
+function pozostalaPraca(z) {
+  return Math.max(0, szacowanyCzas(z) - zrobioneSesje(z.id).length);
+}
+/** Jaka część potrzebnej pracy mieści się w czasie do terminu (1 = dokładnie tyle, ile trzeba). */
+function wskaznikCzasu(z) {
+  if (!z.termin) return Infinity;
+  const praca = pozostalaPraca(z);
+  if (praca === 0) return Infinity;
+  const dni = roznicaDni(DZIS, z.termin);
+  if (dni < 0) return -1;
+  return dni / praca;
+}
+/** Poziom intensywności: luz / spokojnie / pora / pilne / krytyczne (albo okresowe). */
+function poziom(z) {
+  if (czyOkresowe(z)) return 'okresowe';
+  const w = wskaznikCzasu(z);
+  return POZIOMY.find(p => w >= p.od).klucz;
+}
+function opisWskaznika(z) {
+  const w = wskaznikCzasu(z);
+  if (!z.termin) return 'bez terminu';
+  if (w === Infinity) return 'praca zrobiona';
+  if (w < 0) return 'po terminie';
+  return `zostało ${Math.round(w * 100)}% potrzebnego czasu`;
 }
 function poTerminie(z) {
   return !z.wykonane && z.termin && z.termin < DZIS;
@@ -236,42 +314,32 @@ function zrobioneSesje(id) {
 }
 
 /**
- * Rozkłada pozostałe sesje pracy na dni przed terminem.
- * - Ile sesji: zależy od WAŻNOŚCI (wysoki 4, średni 2, niski 1).
- * - Jak gęsto: zależy od PILNOŚCI. Idealnie sesje są co drugi dzień
- *   w oknie kończącym się dzień przed terminem. Gdy czasu jest mało,
- *   okno się kurczy i kilka sesji wypada w tym samym dniu.
- * - Plan liczy się na nowo każdego dnia: pominięta sesja nie przepada,
- *   tylko "dociska" pozostałe dni (stąd ostrzeżenia o przeciążeniu).
+ * Plan dni pracy: ceil(x) bloków pracy rozłożonych równo w oknie 2·x dni
+ * przed terminem (zaczynamy, gdy czasu jest jeszcze 2× więcej niż trzeba).
+ * Gdy czasu jest mniej – okno się kurczy, a przy braku dni kilka bloków
+ * wypada w jednym dniu (to widać potem jako przeciążenie).
+ * Plan liczy się na nowo każdego dnia: pominięty dzień pracy nie przepada.
+ * Zadania okresowe i powtórki nie dostają dni pracy (same są "pracą").
  */
 function planSesji(z) {
-  if (z.wykonane || !z.termin) return [];
-  // Tryb sesji egzaminacyjnej: powtórki same są nauką, a egzamin z powtórkami nie dostaje sesji.
-  if (czyPowtorka(z)) return [];
+  if (z.wykonane || !z.termin || czyOkresowe(z) || czyPowtorka(z)) return [];
   if (czyEgzamin(z) && powtorkiEgzaminu(z).length) return [];
-  const potrzebne = SESJE_NA_PRIORYTET[z.priorytet] || 1;
+  const potrzebne = Math.max(1, Math.ceil(szacowanyCzas(z)));
   const zrobione = zrobioneSesje(z.id);
   const zostalo = Math.max(0, potrzebne - zrobione.length);
   if (zostalo === 0) return [];
 
   const doTerminu = roznicaDni(DZIS, z.termin);
-  const start = zrobione.includes(DZIS) ? 1 : 0;   // dzisiejsza już zrobiona → zaczynamy od jutra
-  let koniec = doTerminu - 1;                       // ostatni dzień przed terminem
+  const start = zrobione.includes(DZIS) ? 1 : 0;   // dzisiejszy dzień pracy już zrobiony → od jutra
+  const koniec = doTerminu - 1;                    // ostatni dzień przed terminem
+  if (koniec < start) return [];                   // termin dziś lub minął – nie ma już dni "przed"
 
-  // Termin dziś albo już minął: nie ma dni "przed terminem", więc nie planujemy sesji.
-  // Samo zadanie i tak liczy się do dzisiejszego obciążenia (i widać je jako pilne / zaległe).
-  if (koniec < start) return [];
-
+  const okno = Math.ceil(2 * szacowanyCzas(z));
+  const poczatek = Math.max(start, koniec - okno + 1);
+  const dlugosc = koniec - poczatek + 1;
   const dni = [];
-  {
-    const okno = 2 * potrzebne;                     // np. 4 sesje → okno 8 dni (co drugi dzień)
-    const poczatek = Math.max(start, koniec - okno + 1);
-    const dlugosc = koniec - poczatek + 1;
-    for (let i = 0; i < zostalo; i++) {
-      dni.push(koniec - Math.floor(i * dlugosc / zostalo));
-    }
-    dni.reverse();
-  }
+  for (let i = 0; i < zostalo; i++) dni.push(koniec - Math.floor(i * dlugosc / zostalo));
+  dni.reverse();
 
   return dni.map((offset, i) => ({
     data: dodajDni(DZIS, offset),
@@ -279,6 +347,11 @@ function planSesji(z) {
     nr: zrobione.length + i + 1,
     z: potrzebne,
   }));
+}
+
+/** Punkty, jakie zadanie dokłada w dniu swojego terminu. */
+function punktyTerminu(z) {
+  return czyOkresowe(z) || czyPowtorka(z) ? PUNKTY_ZA_SESJE : PUNKTY_ZA_TERMIN[z.priorytet];
 }
 
 /** Zbiera wszystko, co przypada na każdy dzień w horyzoncie planowania. */
@@ -293,7 +366,7 @@ function obciazenieDni() {
       const dzien = z.termin < DZIS ? DZIS : z.termin;   // zaległe liczą się do dziś
       if (mapa[dzien]) {
         mapa[dzien].terminy.push(z);
-        mapa[dzien].punkty += czyPowtorka(z) ? PUNKTY_ZA_SESJE : PUNKTY_ZA_TERMIN[z.priorytet];
+        mapa[dzien].punkty += punktyTerminu(z);
       }
     }
     for (const s of planSesji(z)) {
@@ -404,10 +477,12 @@ function porownajWaznosc(a, b) {
 
 /* ---------- Wszystkie zadania: kolumny z kafelkami ---------- */
 const KOLUMNY = {
-  pilnosc: [
-    { klucz: 'pilne', nazwa: 'Pilne', opis: 'po terminie, dziś lub jutro' },
-    { klucz: 'wkrotce', nazwa: 'Wkrótce', opis: '2–7 dni' },
-    { klucz: 'spokojnie', nazwa: 'Spokojnie', opis: 'ponad tydzień lub bez terminu' },
+  poziom: [
+    { klucz: 'krytyczne', nazwa: 'Krytyczne', opis: 'mniej niż 30% potrzebnego czasu' },
+    { klucz: 'pilne', nazwa: 'Pilne', opis: '30–53% potrzebnego czasu' },
+    { klucz: 'pora', nazwa: 'Pora zaczynać', opis: '53–77% potrzebnego czasu' },
+    { klucz: 'spokojnie', nazwa: 'Spokojnie', opis: '77–100% potrzebnego czasu' },
+    { klucz: 'luz', nazwa: 'Luz', opis: 'czasu jest tyle, ile trzeba, albo więcej' },
   ],
   waznosc: [
     { klucz: 'wysoki', nazwa: 'Wysoka ważność', opis: 'priorytet wysoki' },
@@ -419,9 +494,9 @@ const KOLUMNY = {
 function htmlKafelka(z) {
   return `
     <li>
-      <button class="kafelek p-${z.priorytet} ${z.wykonane ? 'zrobiony' : ''}" data-akcja="szczegoly" data-id="${z.id}">
-        <span class="kafelek-tytul">${esc(z.tytul)}</span>
-        <span class="kafelek-podtytul ${z.wykonane ? '' : pilnosc(z)}">${z.wykonane ? 'zrobione' : esc(opisTerminu(z.termin))}</span>
+      <button class="kafelek ${czyOkresowe(z) ? 'p-brak' : 'p-' + z.priorytet} ${z.wykonane ? 'zrobiony' : ''}" data-akcja="szczegoly" data-id="${z.id}">
+        <span class="kafelek-tytul">${czyOkresowe(z) ? '<span class="ikona-okres" title="Zadanie okresowe">↻</span> ' : ''}${esc(z.tytul)}</span>
+        <span class="kafelek-podtytul ${z.wykonane ? '' : poziom(z)}">${z.wykonane ? 'zrobione' : esc(opisTerminu(z.termin))}</span>
       </button>
     </li>`;
 }
@@ -441,26 +516,29 @@ function htmlKolumny(klucz, nazwa, opis, zadania) {
 }
 
 function widokWszystkie() {
-  const tagi = [...new Set(dane.zadania.flatMap(z => z.tagi))].sort((a, b) => a.localeCompare(b, 'pl'));
+  const tagi = [...new Set(dane.zadania.flatMap(widoczneTagi))].sort((a, b) => a.localeCompare(b, 'pl'));
   const fraza = filtry.szukaj.trim().toLowerCase();
   const pasuje = z =>
     (!filtry.tag || z.tagi.includes(filtry.tag)) &&
-    (!fraza || (z.tytul + ' ' + z.opis + ' ' + z.tagi.join(' ')).toLowerCase().includes(fraza));
+    (!fraza || (z.tytul + ' ' + z.opis + ' ' + widoczneTagi(z).join(' ')).toLowerCase().includes(fraza));
 
   const aktywne = dane.zadania.filter(z => !z.wykonane && pasuje(z)).sort(porownajTermin);
   const zrobione = dane.zadania.filter(z => z.wykonane && pasuje(z)).sort(porownajTermin);
   const ileZrobionych = dane.zadania.filter(z => z.wykonane).length;
 
-  const grupa = filtry.grupuj === 'waznosc' ? (z => z.priorytet) : pilnosc;
-  let kolumny = KOLUMNY[filtry.grupuj].map(k =>
-    htmlKolumny(k.klucz, k.nazwa, k.opis, aktywne.filter(z => grupa(z) === k.klucz)));
+  const grupa = filtry.grupuj === 'waznosc' ? (z => z.priorytet) : poziom;
+  const zwykle = aktywne.filter(z => !czyOkresowe(z));
+  const kolumny = KOLUMNY[filtry.grupuj].map(k =>
+    htmlKolumny(k.klucz, k.nazwa, k.opis, zwykle.filter(z => grupa(z) === k.klucz)));
+  // zadania okresowe nie mają priorytetu ani poziomu – osobna, szara kolumna
+  kolumny.push(htmlKolumny('okresowe', 'Okresowe', 'siłownia, zakupy, opłaty… – bez priorytetu', aktywne.filter(czyOkresowe)));
   if (filtry.pokazZrobione) kolumny.push(htmlKolumny('zrobione', 'Zrobione', 'odhaczone zadania', zrobione));
 
   const pasek = `
     <div class="filtry">
       <div class="przelacznik" role="group" aria-label="Układ kolumn">
         <span class="maly-tekst">Kolumny wg:</span>
-        <button class="${filtry.grupuj === 'pilnosc' ? 'wl' : ''}" data-akcja="grupuj" data-wartosc="pilnosc">Pilności</button>
+        <button class="${filtry.grupuj === 'poziom' ? 'wl' : ''}" data-akcja="grupuj" data-wartosc="poziom">Intensywności</button>
         <button class="${filtry.grupuj === 'waznosc' ? 'wl' : ''}" data-akcja="grupuj" data-wartosc="waznosc">Ważności</button>
       </div>
       <input type="search" data-filtr="szukaj" placeholder="Szukaj…" value="${esc(filtry.szukaj)}" aria-label="Szukaj">
@@ -479,7 +557,7 @@ function widokWszystkie() {
       <button class="przycisk glowny" data-akcja="nowe">+ Dodaj pierwsze zadanie</button>
       <button class="przycisk" data-akcja="wczytaj">Wczytaj plik JSON</button></div>`;
   }
-  return pasek + `<div class="tablica ${filtry.pokazZrobione ? 'cztery' : ''}">${kolumny.join('')}</div>
+  return pasek + `<div class="tablica">${kolumny.join('')}</div>
     <p class="maly-tekst tydzien-stopka">W kolumnie zadania są ułożone według terminu. Kliknij kafelek, aby zobaczyć szczegóły.</p>`;
 }
 
@@ -490,18 +568,24 @@ function pokazSzczegoly(id) {
   const z = znajdz(id);
   if (!z) { if (oknoSzczegoly.open) oknoSzczegoly.close(); return; }
   szczegolyId = id;
-  const p = pilnosc(z);
+  const p = poziom(z);
+  const okresowe = czyOkresowe(z);
   const plan = planSesji(z);
-  const potrzebne = SESJE_NA_PRIORYTET[z.priorytet];
+  const potrzebne = Math.max(1, Math.ceil(szacowanyCzas(z)));
+  const zrobioneDni = zrobioneSesje(z.id).length;
   let planHtml;
   const powtorki = czyEgzamin(z) ? powtorkiEgzaminu(z) : [];
   if (z.wykonane) planHtml = 'Zadanie zrobione.';
-  else if (czyPowtorka(z)) planHtml = 'To powtórka przed egzaminem (tryb sesji) – sama jest sesją nauki.';
+  else if (okresowe) planHtml = 'Zadanie okresowe – bez rozpisanej pracy, po prostu zrób je w swoim dniu.';
+  else if (czyPowtorka(z)) planHtml = 'To powtórka przed egzaminem – sama jest dniem nauki.';
   else if (powtorki.length) planHtml = `Powtórki: ${powtorki.filter(x => x.wykonane).length} z ${powtorki.length} zrobione · ` + powtorki.map(x => (x.wykonane ? '✓ ' : '') + ladnaData(x.termin)).join(' · ');
-  else if (!z.termin) planHtml = 'Bez terminu – nie da się zaplanować sesji. Zrób je w luźniejszy dzień.';
-  else if (!plan.length && zrobioneSesje(z.id).length >= potrzebne) planHtml = `Wszystkie sesje pracy (${potrzebne}) zrobione.`;
-  else if (!plan.length) planHtml = 'Termin jest dziś lub minął – nie planujemy już sesji, czas działać.';
-  else planHtml = `${plan.length} z ${potrzebne} sesji do zrobienia: ` + plan.map(s => s.data === DZIS ? 'dziś' : ladnaData(s.data)).join(' · ');
+  else if (!z.termin) planHtml = 'Bez terminu – nie da się zaplanować dni pracy. Zrób je w luźniejszy dzień.';
+  else if (!plan.length && zrobioneDni >= potrzebne) planHtml = `Wszystkie dni pracy (${potrzebne}) zrobione.`;
+  else if (!plan.length) planHtml = 'Termin jest dziś lub minął – nie planujemy już dni pracy, czas działać.';
+  else planHtml = `${plan.length} z ${potrzebne} dni pracy do zrobienia: ` + listaDniPracy(plan);
+  const czasHtml = okresowe ? '–'
+    : `${formatDni(szacowanyCzas(z))}${czasZTagu(z) === null ? ' <span class="maly-tekst">(domyślnie wg ważności)</span>' : ''}`
+      + (zrobioneDni ? ` · zrobione: ${formatDni(zrobioneDni)}` : '');
 
   document.getElementById('szczegoly-tresc').innerHTML = `
     <div class="szcz-gora">
@@ -511,9 +595,10 @@ function pokazSzczegoly(id) {
     ${z.opis ? `<p class="szcz-opis">${esc(z.opis)}</p>` : '<p class="szcz-opis maly-tekst">Brak opisu.</p>'}
     <dl class="szcz-lista">
       <dt>Termin</dt><dd>${!z.termin ? 'bez terminu' : roznicaDni(DZIS, z.termin) > 1 ? esc(opisTerminu(z.termin)) : esc(ladnaData(z.termin)) + ' · ' + esc(opisTerminu(z.termin))}</dd>
-      <dt>Ważność</dt><dd><span class="znaczek w-${z.priorytet}">${NAZWA_PRIORYTETU[z.priorytet]}</span></dd>
-      <dt>Pilność</dt><dd>${z.wykonane ? '–' : `<span class="znaczek ${p}">${NAZWA_PILNOSCI[p]}</span>`}</dd>
-      <dt>Tagi</dt><dd>${z.tagi.length ? z.tagi.map(t => `<span class="znaczek tag">#${esc(t)}</span>`).join(' ') : '–'}</dd>
+      <dt>Ważność</dt><dd>${okresowe ? '<span class="znaczek">↻ zadanie okresowe – bez priorytetu</span>' : `<span class="znaczek w-${z.priorytet}">${NAZWA_PRIORYTETU[z.priorytet]}</span>`}</dd>
+      <dt>Czas pracy</dt><dd>${czasHtml}</dd>
+      <dt>Intensywność</dt><dd>${z.wykonane || okresowe ? '–' : `<span class="znaczek ${p}">${NAZWA_POZIOMU[p]}</span> <span class="maly-tekst">${esc(opisWskaznika(z))}</span>`}</dd>
+      <dt>Tagi</dt><dd>${widoczneTagi(z).length ? widoczneTagi(z).map(t => `<span class="znaczek tag">#${esc(t)}</span>`).join(' ') : '–'}</dd>
       <dt>Status</dt><dd>${z.wykonane ? '✓ Zrobione' : 'Do zrobienia'}</dd>
       <dt>Plan pracy</dt><dd>${planHtml}</dd>
     </dl>
@@ -563,7 +648,7 @@ function daneKalendarza(start, dni) {
       const dzien = z.termin < DZIS ? DZIS : z.termin;   // zaległe pokazujemy dziś
       if (mapa[dzien]) {
         mapa[dzien].terminy.push(z);
-        mapa[dzien].punkty += czyPowtorka(z) ? PUNKTY_ZA_SESJE : PUNKTY_ZA_TERMIN[z.priorytet];
+        mapa[dzien].punkty += punktyTerminu(z);
       }
     }
     for (const s of planSesji(z)) {
@@ -571,7 +656,7 @@ function daneKalendarza(start, dni) {
     }
     // sesje odhaczone (np. dziś) – pokazujemy jako zrobione
     zrobioneSesje(z.id).forEach((d, i) => {
-      if (mapa[d]) mapa[d].sesje.push({ data: d, zadanie: z, nr: i + 1, z: SESJE_NA_PRIORYTET[z.priorytet], zrobiona: true });
+      if (mapa[d]) mapa[d].sesje.push({ data: d, zadanie: z, nr: i + 1, z: Math.max(1, Math.ceil(szacowanyCzas(z))), zrobiona: true });
     });
   }
   for (const info of Object.values(mapa)) {
@@ -584,11 +669,11 @@ function daneKalendarza(start, dni) {
 function htmlTerminuKal(z) {
   const zalegle = z.termin < DZIS;
   return `
-    <li class="karta p-${z.priorytet}">
+    <li class="karta ${czyOkresowe(z) ? 'p-brak' : 'p-' + z.priorytet}">
       <button class="odhacz maly-odhacz" data-akcja="odhacz" data-id="${z.id}" title="Oznacz jako zrobione" aria-label="Oznacz jako zrobione"></button>
       <button class="karta-tresc" data-akcja="szczegoly" data-id="${z.id}" title="Pokaż szczegóły">
-        <span class="karta-tytul">${esc(z.tytul)}</span>
-        ${zalegle ? `<span class="znaczek pilne">zaległe · ${esc(ladnaData(z.termin, false))}</span>` : ''}
+        <span class="karta-tytul">${czyOkresowe(z) ? '<span class="ikona-okres" title="Zadanie okresowe">↻</span> ' : ''}${esc(z.tytul)}</span>
+        ${zalegle ? `<span class="znaczek krytyczne">zaległe · ${esc(ladnaData(z.termin, false))}</span>` : ''}
       </button>
     </li>`;
 }
@@ -599,23 +684,23 @@ function htmlSesjiKal(s) {
   return `
     <li class="sesja-kal ${zrobiona ? 'zrobiona' : ''}">
       ${dzis ? `<button class="odhacz maly-odhacz kwadrat" data-akcja="sesja" data-id="${s.zadanie.id}" data-data="${s.data}"
-        title="${zrobiona ? 'Cofnij' : 'Odhacz sesję'}" aria-label="Odhacz sesję">${zrobiona ? '✓' : ''}</button>` : '<span class="sesja-znak"></span>'}
-      <button class="karta-tresc" data-akcja="szczegoly" data-id="${s.zadanie.id}" title="Sesja pracy – pokaż zadanie">
-        <span class="karta-tytul">Sesja ${s.nr}/${s.z}: ${esc(s.zadanie.tytul)}</span>
+        title="${zrobiona ? 'Cofnij' : 'Odhacz dzień pracy'}" aria-label="Odhacz dzień pracy">${zrobiona ? '✓' : ''}</button>` : '<span class="sesja-znak"></span>'}
+      <button class="karta-tresc" data-akcja="szczegoly" data-id="${s.zadanie.id}" title="Dzień pracy – pokaż zadanie">
+        <span class="karta-tytul">Praca ${s.nr}/${s.z}: ${esc(s.zadanie.tytul)}</span>
       </button>
     </li>`;
 }
 
 function htmlKropek(info) {
   const kropki = info.terminy.map(z => {
-    const p = pilnosc(z);
+    const p = poziom(z);   // okresowe → szary kwadrat, reszta → kropka w kolorze intensywności
     return `<button class="kropka-kal ${p}" data-akcja="szczegoly" data-id="${z.id}"
-      title="${esc(z.tytul)} (${NAZWA_PILNOSCI[p].toLowerCase()})" aria-label="${esc(z.tytul)}"></button>`;
+      title="${esc(z.tytul)} (${NAZWA_POZIOMU[p].toLowerCase()})" aria-label="${esc(z.tytul)}"></button>`;
   });
   if (terminarz.pokazSesje) {
     for (const s of info.sesje) {
       kropki.push(`<button class="kropka-kal sesja ${s.zrobiona ? 'zrobiona' : ''}" data-akcja="szczegoly" data-id="${s.zadanie.id}"
-        title="Sesja ${s.nr}/${s.z}: ${esc(s.zadanie.tytul)}" aria-label="Sesja: ${esc(s.zadanie.tytul)}"></button>`);
+        title="Praca ${s.nr}/${s.z}: ${esc(s.zadanie.tytul)}" aria-label="Dzień pracy: ${esc(s.zadanie.tytul)}"></button>`);
     }
   }
   return kropki.length ? `<div class="kropki">${kropki.join('')}</div>` : '';
@@ -689,7 +774,7 @@ function widokTerminarz() {
       </div>
       <strong class="term-tytul">${esc(tytul)}</strong>
       <label class="pokaz-zrobione">
-        <input type="checkbox" data-akcja="pokaz-sesje" ${terminarz.pokazSesje ? 'checked' : ''}> Sesje pracy
+        <input type="checkbox" data-akcja="pokaz-sesje" ${terminarz.pokazSesje ? 'checked' : ''}> Dni pracy
       </label>
     </div>`;
 
@@ -697,9 +782,10 @@ function widokTerminarz() {
   const komorki = Object.entries(mapa).map(([d, info]) => htmlDniaKal(d, info, tryb, zakres)).join('');
 
   const legenda = tryb === 'miesiac'
-    ? `<span class="legenda"><i class="kropka-kal pilne"></i> pilne <i class="kropka-kal wkrotce"></i> wkrótce <i class="kropka-kal spokojnie"></i> spokojnie
-       ${terminarz.pokazSesje ? '<i class="kropka-kal sesja"></i> sesja pracy' : ''}</span> Kliknij kropkę, aby zobaczyć zadanie.`
-    : 'Kolor paska przy zadaniu = ważność. Kliknij zadanie, aby zobaczyć szczegóły, a kółko – aby je odhaczyć. Sesje pracy są w przerywanej ramce.';
+    ? `<span class="legenda">${POZIOMY.map(p => `<i class="kropka-kal ${p.klucz}"></i> ${p.nazwa.toLowerCase()}`).join(' ')}
+       <i class="kropka-kal okresowe"></i> okresowe
+       ${terminarz.pokazSesje ? '<i class="kropka-kal sesja"></i> dzień pracy' : ''}</span> Kliknij kropkę lub kwadrat, aby zobaczyć zadanie.`
+    : 'Kolor paska przy zadaniu = ważność (szary ↻ = zadanie okresowe). Kliknij zadanie, aby zobaczyć szczegóły, a kółko – aby je odhaczyć. Dni pracy są w przerywanej ramce.';
   const bezTerminu = dane.zadania.filter(z => !z.wykonane && !z.termin).length;
 
   return pasekNarzedzi + naglowkiDni +
@@ -958,7 +1044,7 @@ function widokAlarmy(mapa) {
     <section class="sekcja">
       <h2>Jak liczymy punkty?</h2>
       <div class="obciazenie maly-tekst" style="color:var(--tekst)">
-        Termin zadania: <b>wysoki 3 pkt</b>, <b>średni 2 pkt</b>, <b>niski 1 pkt</b> · każda sesja pracy: <b>1 pkt</b>.<br>
+        Termin zadania: <b>wysoki 3 pkt</b>, <b>średni 2 pkt</b>, <b>niski 1 pkt</b> · każdy dzień pracy, powtórka i zadanie okresowe: <b>1 pkt</b>.<br>
         Dzień powyżej <b>${LIMIT_DNIA} pkt</b> jest przeciążony – wtedy podpowiadamy wcześniejszy, luźniejszy dzień,
         żeby zacząć pracę zawczasu zamiast robić wszystko na ostatnią chwilę.
       </div>
@@ -1006,36 +1092,56 @@ const formularz = document.getElementById('formularz');
 
 function zbierzFormularz() {
   const f = new FormData(formularz);
+  const okresowe = f.get('okresowe') === 'tak';
+  const czas = parseFloat(String(f.get('czas') || '').replace(',', '.'));
+  // tagi widoczne dla użytkownika + ukryte: "okresowe" i "⏱Nd" (szacowany czas pracy)
+  const tagi = (f.get('tagi') || '').split(',').map(t => t.trim().replace(/^#/, '')).filter(t => t && !czyTagUkryty(t));
+  if (okresowe) tagi.push(TAG_OKRESOWE);
+  else if (czas > 0) tagi.push(tagCzasu(Math.round(czas * 10) / 10));
+  const poprzednie = edytowaneId !== null ? znajdz(edytowaneId) : null;
   return {
     tytul: (f.get('tytul') || '').trim(),
     opis: (f.get('opis') || '').trim(),
     termin: f.get('termin') || null,
-    priorytet: f.get('priorytet') || 'sredni',
-    tagi: [...new Set((f.get('tagi') || '').split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean))],
+    // zadanie okresowe nie ma priorytetu, ale format JSON wymaga wartości – zostawiamy dotychczasową (albo "niski")
+    priorytet: okresowe ? (poprzednie ? poprzednie.priorytet : 'niski') : (f.get('priorytet') || 'sredni'),
+    tagi: [...new Set(tagi)],
   };
 }
 
+/** Okresowe zadanie nie ma ważności ani czasu pracy – chowamy te pola. */
+function ustawPolaOkresowe() {
+  const okresowe = formularz.okresowe.checked;
+  document.getElementById('pole-waznosc').hidden = okresowe;
+  document.getElementById('pole-czas').hidden = okresowe;
+  formularz.czas.placeholder = `domyślnie ${formatDni(DOMYSLNY_CZAS[formularz.querySelector('input[name="priorytet"]:checked')?.value || 'sredni'])}`;
+}
+
 function podgladPlanu() {
+  ustawPolaOkresowe();
   const w = zbierzFormularz();
   const el = document.getElementById('podglad-planu');
-  if (!w.termin || !poprawnaData(w.termin)) {
-    el.innerHTML = 'Dodaj termin, a aplikacja sama rozłoży sesje pracy na dni przed nim.';
-    return;
-  }
   const proba = { id: edytowaneId ?? -1, ...w, wykonane: false };
+  if (czyOkresowe(proba)) {
+    el.innerHTML = 'Zadanie okresowe: bez priorytetu i bez rozpisanej pracy – w kalendarzu pokaże się jako szary kwadrat.';
+    return;
+  }
+  if (!w.termin || !poprawnaData(w.termin)) {
+    el.innerHTML = 'Dodaj termin, a aplikacja policzy intensywność i rozłoży dni pracy przed nim.';
+    return;
+  }
   if (czyPowtorka(proba)) {
-    el.innerHTML = 'To powtórka przed egzaminem – nie dostaje osobnych sesji pracy.';
+    el.innerHTML = 'To powtórka przed egzaminem – nie dostaje osobnych dni pracy.';
     return;
   }
+  const p = poziom(proba);
   const plan = planSesji(proba);
-  const potrzebne = SESJE_NA_PRIORYTET[w.priorytet];
-  const p = pilnosc(proba);
+  const naglowek = `Czas pracy: <b>${formatDni(szacowanyCzas(proba))}</b> · Intensywność: <b class="tekst-${p}">${NAZWA_POZIOMU[p]}</b> (${esc(opisWskaznika(proba))})`;
   if (!plan.length) {
-    el.innerHTML = `Pilność: <b>${NAZWA_PILNOSCI[p]}</b>. Wszystkie sesje pracy (${potrzebne}) już zrobione.`;
+    el.innerHTML = naglowek + '<br>Brak dni pracy do zaplanowania przed terminem.';
     return;
   }
-  const dni = plan.map(s => s.data === DZIS ? 'dziś' : ladnaData(s.data)).join(' · ');
-  el.innerHTML = `Pilność: <b>${NAZWA_PILNOSCI[p]}</b> · Ważność: <b>${NAZWA_PRIORYTETU[w.priorytet]}</b> → ${potrzebne} ${potrzebne === 1 ? 'sesja' : 'sesje'} pracy.<br>Plan: ${dni}.`;
+  el.innerHTML = `${naglowek}<br>Dni pracy (${plan.length}): ${listaDniPracy(plan)}.`;
 }
 
 function otworzFormularz(id = null, domyslnyTermin = null) {
@@ -1046,12 +1152,15 @@ function otworzFormularz(id = null, domyslnyTermin = null) {
   formularz.tytul.value = z ? z.tytul : '';
   formularz.opis.value = z ? z.opis : '';
   formularz.termin.value = z && z.termin ? z.termin : (domyslnyTermin || '');
-  formularz.tagi.value = z ? z.tagi.join(', ') : '';
+  formularz.tagi.value = z ? widoczneTagi(z).join(', ') : '';
+  formularz.okresowe.checked = z ? czyOkresowe(z) : false;
+  const czas = z ? czasZTagu(z) : null;
+  formularz.czas.value = czas !== null ? czas : '';
   const pri = z ? z.priorytet : 'sredni';
   formularz.querySelector(`input[name="priorytet"][value="${pri}"]`).checked = true;
   document.getElementById('blad-tytul').textContent = '';
 
-  const wszystkieTagi = [...new Set(dane.zadania.flatMap(x => x.tagi))];
+  const wszystkieTagi = [...new Set(dane.zadania.flatMap(widoczneTagi))];
   document.getElementById('lista-tagow').innerHTML = wszystkieTagi.map(t => `<option value="${esc(t)}">`).join('');
 
   podgladPlanu();

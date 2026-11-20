@@ -55,7 +55,7 @@
           <small class="podpowiedz">Zostaw puste, jeśli zadanie nie ma terminu.</small>
         </label>
 
-        <fieldset class="pole">
+        <fieldset class="pole" id="pole-waznosc">
           <legend>Ważność (priorytet)</legend>
           <div class="segmenty">
             <label><input type="radio" name="priorytet" value="niski"><span>Niski</span></label>
@@ -63,6 +63,19 @@
             <label><input type="radio" name="priorytet" value="wysoki"><span>Wysoki</span></label>
           </div>
         </fieldset>
+      </div>
+
+      <div class="rzad">
+        <label class="pole" id="pole-czas">
+          <span>Szacowany czas pracy (dni)</span>
+          <input name="czas" type="number" min="0.5" step="0.5" inputmode="decimal">
+          <small class="podpowiedz">Ile dni pracy, żeby zrobić to spokojnie (np. projekt 30).</small>
+        </label>
+        <label class="pole przelacznik-okres">
+          <span>Rodzaj zadania</span>
+          <span class="checkbox-wiersz"><input name="okresowe" type="checkbox" value="tak"> ↻ Zadanie okresowe</span>
+          <small class="podpowiedz">Siłownia, zakupy, opłaty… – bez priorytetu i bez planowania.</small>
+        </label>
       </div>
 
       <label class="pole">

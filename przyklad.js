@@ -10,7 +10,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-18",
       "priorytet": "wysoki",
       "wykonane": false,
-      "tagi": ["studia"]
+      "tagi": ["studia", "⏱3d"]
     },
     {
       "id": 2,
@@ -19,7 +19,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-25",
       "priorytet": "wysoki",
       "wykonane": false,
-      "tagi": ["studia", "projekt"]
+      "tagi": ["studia", "projekt", "⏱10d"]
     },
     {
       "id": 3,
@@ -28,7 +28,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-21",
       "priorytet": "sredni",
       "wykonane": false,
-      "tagi": ["dom"]
+      "tagi": ["dom", "okresowe"]
     },
     {
       "id": 4,
@@ -37,7 +37,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-30",
       "priorytet": "wysoki",
       "wykonane": false,
-      "tagi": ["finanse"]
+      "tagi": ["finanse", "okresowe"]
     },
     {
       "id": 5,
@@ -46,7 +46,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": null,
       "priorytet": "niski",
       "wykonane": false,
-      "tagi": ["studia"]
+      "tagi": ["studia", "⏱0.5d"]
     },
     {
       "id": 6,
@@ -55,7 +55,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-22",
       "priorytet": "sredni",
       "wykonane": true,
-      "tagi": ["studia"]
+      "tagi": ["studia", "⏱1d"]
     },
     {
       "id": 7,
@@ -64,7 +64,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-20",
       "priorytet": "niski",
       "wykonane": false,
-      "tagi": ["sport"]
+      "tagi": ["sport", "okresowe"]
     },
     {
       "id": 8,
@@ -73,7 +73,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-12-15",
       "priorytet": "wysoki",
       "wykonane": false,
-      "tagi": ["studia", "egzamin"]
+      "tagi": ["studia", "egzamin", "⏱10d"]
     },
     {
       "id": 9,
@@ -91,7 +91,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": null,
       "priorytet": "niski",
       "wykonane": false,
-      "tagi": ["rodzina"]
+      "tagi": ["rodzina", "okresowe"]
     },
     {
       "id": 11,
@@ -100,7 +100,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-12-03",
       "priorytet": "wysoki",
       "wykonane": false,
-      "tagi": ["studia", "projekt"]
+      "tagi": ["studia", "projekt", "⏱15d"]
     },
     {
       "id": 12,
@@ -109,7 +109,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-22",
       "priorytet": "niski",
       "wykonane": false,
-      "tagi": ["dom"]
+      "tagi": ["dom", "okresowe"]
     },
     {
       "id": 13,
@@ -118,7 +118,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-30",
       "priorytet": "sredni",
       "wykonane": false,
-      "tagi": ["finanse"]
+      "tagi": ["finanse", "okresowe"]
     },
     {
       "id": 14,
@@ -127,7 +127,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-27",
       "priorytet": "wysoki",
       "wykonane": false,
-      "tagi": ["studia"]
+      "tagi": ["studia", "⏱10d"]
     },
     {
       "id": 15,
@@ -136,7 +136,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": null,
       "priorytet": "sredni",
       "wykonane": false,
-      "tagi": []
+      "tagi": ["⏱0.5d"]
     },
     {
       "id": 16,
@@ -145,7 +145,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-12-01",
       "priorytet": "wysoki",
       "wykonane": false,
-      "tagi": ["praca"]
+      "tagi": ["praca", "⏱2d"]
     },
     {
       "id": 17,
@@ -172,7 +172,7 @@ window.PRZYKLADOWE_DANE = {
       "termin": "2026-11-23",
       "priorytet": "niski",
       "wykonane": false,
-      "tagi": ["studia"]
+      "tagi": ["studia", "⏱1d"]
     },
     {
       "id": 20,
