@@ -304,7 +304,20 @@ function dniNaPrace(z) {
 /** Szacowany czas pracy w dniach (podany przez użytkownika albo domyślny). */
 function szacowanyCzas(z) {
   if (czyPowtorka(z)) return 1;   // powtórka ma swoją długość w godzinach, intensywność liczymy jak dla 1 dnia
-  return czasZTagu(z) ?? (DOMYSLNY_CZAS[z.priorytet] || 1);
+  const dni = czasZTagu(z);
+  if (dni !== null) return dni;
+  const godz = godzinyZTagu(z);   // podano tylko godziny → dni wyliczamy z krzywej użytkownika
+  if (godz !== null) return Math.max(0.25, dniZGodzin(godz));
+  return DOMYSLNY_CZAS[z.priorytet] || 1;
+}
+/** Godziny czystej pracy wpisane ręcznie (ukryty tag "⏱12h"); null = liczone automatycznie. */
+function godzinyZTagu(z) {
+  if (czyPowtorka(z)) return null;
+  for (const t of z.tagi) {
+    const m = /^⏱\s*(\d+(?:[.,]\d+)?)\s*h$/.exec(t);
+    if (m) { const v = parseFloat(m[1].replace(',', '.')); if (v > 0) return v; }
+  }
+  return null;
 }
 
 /* ---------- Godziny pracy (dopasowane do użytkownika) ----------
@@ -357,11 +370,13 @@ function wpisySesji(id) {
 function zrobioneSesje(id) { return wpisySesji(id).map(w => w.d); }
 function godzinyZrobione(id) { return wpisySesji(id).reduce((s, w) => s + (Number(w.h) || 0), 0); }
 
-function godzinyRazem(z) { return godzinyZDni(szacowanyCzas(z)); }
+function godzinyRazem(z) { return godzinyZTagu(z) ?? godzinyZDni(szacowanyCzas(z)); }   // ręcznie wpisane godziny mają pierwszeństwo
 function godzinyPozostale(z) { return Math.max(0, godzinyRazem(z) - godzinyZrobione(z.id)); }
 /** Pozostała praca wyrażona w dniach spokojnego planu (do liczenia intensywności). */
 function pozostalaPraca(z) {
-  return dniZGodzin(godzinyPozostale(z));
+  // ta część szacowanego czasu, która odpowiada jeszcze niezrobionym godzinom
+  const razem = godzinyRazem(z);
+  return razem > 0 ? szacowanyCzas(z) * godzinyPozostale(z) / razem : 0;
 }
 /** Jaka część potrzebnej pracy mieści się w czasie do terminu (1 = dokładnie tyle, ile trzeba). */
 function wskaznikCzasu(z) {
@@ -768,8 +783,8 @@ function pokazSzczegoly(id) {
   const dniNaPraceHtml = okresowe || !z.termin ? '–'
     : `${formatDni(dniNaPrace(z))} do terminu${wykreslone ? ` <span class="maly-tekst">(bez ${formatDni(wykreslone)} wykreślonych)</span>` : ''}`;
   const czasHtml = okresowe ? '–'
-    : `${formatDni(szacowanyCzas(z))}${czasZTagu(z) === null ? ' <span class="maly-tekst">(domyślnie wg ważności)</span>' : ''}`
-      + ` <span class="maly-tekst">≈ ${formatGodzin(godzinyRazem(z))} czystej pracy</span>`
+    : `${formatDni(szacowanyCzas(z))}${czasZTagu(z) !== null ? '' : godzinyZTagu(z) !== null ? ' <span class="maly-tekst">(wyliczone z godzin)</span>' : ' <span class="maly-tekst">(domyślnie wg ważności)</span>'}`
+      + ` <span class="maly-tekst">${godzinyZTagu(z) !== null ? '' : '≈ '}${formatGodzin(godzinyRazem(z))} czystej pracy${godzinyZTagu(z) !== null ? ' (wpisane ręcznie)' : ''}</span>`
       + (zrobioneH ? ` · zrobione: ${formatGodzin(zrobioneH)}` : '');
 
   document.getElementById('szczegoly-tresc').innerHTML = `
@@ -1044,8 +1059,12 @@ function zbierzFormularz() {
   const czas = parseFloat(String(f.get('czas') || '').replace(',', '.'));
   // tagi widoczne dla użytkownika + ukryte: "okresowe" i "⏱Nd" (szacowany czas pracy)
   const tagi = (f.get('tagi') || '').split(',').map(t => t.trim().replace(/^#/, '')).filter(t => t && !czyTagUkryty(t));
+  const godziny = parseFloat(String(f.get('godziny') || '').replace(',', '.'));
   if (okresowe) tagi.push(TAG_OKRESOWE);
-  else if (czas > 0) tagi.push(tagCzasu(Math.round(czas * 10) / 10));
+  else {
+    if (czas > 0) tagi.push(tagCzasu(Math.round(czas * 10) / 10));
+    if (godziny > 0) tagi.push(`${ZNAK_CZASU}${Math.round(godziny * 10) / 10}h`);   // ręcznie wpisane godziny pracy
+  }
   const poprzednie = edytowaneId !== null ? znajdz(edytowaneId) : null;
   return {
     tytul: (f.get('tytul') || '').trim(),
@@ -1062,11 +1081,26 @@ function ustawPolaOkresowe() {
   const okresowe = formularz.okresowe.checked;
   document.getElementById('pole-waznosc').hidden = okresowe;
   document.getElementById('pole-czas').hidden = okresowe;
+  document.getElementById('pole-godziny').hidden = okresowe;
   formularz.czas.placeholder = `domyślnie ${formatDni(DOMYSLNY_CZAS[formularz.querySelector('input[name="priorytet"]:checked')?.value || 'sredni'])}`;
+}
+
+/** Rekomendowana liczba godzin z krzywej użytkownika – pokazywana przy polu "Godziny pracy". */
+function pokazRekomendacjeGodzin() {
+  const dniPole = parseFloat(String(formularz.czas.value).replace(',', '.'));
+  const pri = formularz.querySelector('input[name="priorytet"]:checked')?.value || 'sredni';
+  const dni = dniPole > 0 ? dniPole : DOMYSLNY_CZAS[pri];
+  const rek = Math.round(godzinyZDni(dni) * 2) / 2;
+  formularz.godziny.placeholder = `${String(rek).replace('.', ',')} (rekomendowane)`;
+  const el = document.getElementById('rekomendacja-godzin');
+  const wpisane = parseFloat(String(formularz.godziny.value).replace(',', '.'));
+  el.innerHTML = `Rekomendacja dla Twojego stylu pracy: <b>${formatGodzin(rek)}</b> (${formatDni(dni)})`
+    + (wpisane > 0 ? ` · <button type="button" class="link" data-akcja="godziny-auto">wróć do rekomendacji</button>` : ' · zostaw puste, żeby jej użyć');
 }
 
 function podgladPlanu() {
   ustawPolaOkresowe();
+  pokazRekomendacjeGodzin();
   const w = zbierzFormularz();
   const el = document.getElementById('podglad-planu');
   const proba = { id: edytowaneId ?? -1, ...w, wykonane: false };
@@ -1084,7 +1118,7 @@ function podgladPlanu() {
   }
   const p = poziom(proba);
   const plan = planSesji(proba);
-  const naglowek = `Spokojnie: <b>${formatDni(szacowanyCzas(proba))}</b> (≈ ${formatGodzin(godzinyRazem(proba))} pracy) · Intensywność: <b class="tekst-${p}">${NAZWA_POZIOMU[p]}</b> (${esc(opisWskaznika(proba))})`;
+  const naglowek = `Spokojnie: <b>${formatDni(szacowanyCzas(proba))}</b> (${godzinyZTagu(proba) !== null ? '' : '≈ '}${formatGodzin(godzinyRazem(proba))} pracy${godzinyZTagu(proba) !== null ? ', wpisane ręcznie' : ''}) · Intensywność: <b class="tekst-${p}">${NAZWA_POZIOMU[p]}</b> (${esc(opisWskaznika(proba))})`;
   if (!plan.length) {
     el.innerHTML = naglowek + '<br>Brak sesji do zaplanowania przed terminem.';
     return;
@@ -1105,6 +1139,8 @@ function otworzFormularz(id = null, domyslnyTermin = null) {
   formularz.okresowe.checked = z ? czyOkresowe(z) : false;
   const czas = z ? czasZTagu(z) : null;
   formularz.czas.value = czas !== null ? czas : '';
+  const godz = z ? godzinyZTagu(z) : null;
+  formularz.godziny.value = godz !== null ? godz : '';
   const pri = z ? z.priorytet : 'sredni';
   formularz.querySelector(`input[name="priorytet"][value="${pri}"]`).checked = true;
   document.getElementById('blad-tytul').textContent = '';
@@ -1390,6 +1426,7 @@ document.addEventListener('click', e => {
     case 'zapisz': zapiszDoPliku(); break;
     case 'anuluj': okno.close(); break;
     case 'zamknij-dzien': oknoDnia.close(); break;
+    case 'godziny-auto': formularz.godziny.value = ''; podgladPlanu(); break;
     case 'profil': otworzProfil(); break;
     case 'wybierz-styl': krokProfilu.styl = el.dataset.styl; rysujProfil(); break;
     case 'wstecz-profil': krokProfilu.styl = null; rysujProfil(); break;

@@ -68,8 +68,16 @@
         <label class="pole" id="pole-czas">
           <span>Czas na spokojne zrobienie (dni)</span>
           <input name="czas" type="number" min="0.5" step="0.5" inputmode="decimal">
-          <small class="podpowiedz">Np. 3 dni ≈ 7,5 h pracy, 30 dni ≈ 37,5 h (krótkie zadania są „gęstsze”).</small>
+          <small class="podpowiedz">Ile dni zajęłoby to w spokojnym tempie (np. projekt 30).</small>
         </label>
+        <label class="pole" id="pole-godziny">
+          <span>Godziny czystej pracy</span>
+          <input name="godziny" type="number" min="0.5" step="0.5" inputmode="decimal">
+          <small class="podpowiedz" id="rekomendacja-godzin"></small>
+        </label>
+      </div>
+
+      <div class="rzad">
         <label class="pole przelacznik-okres">
           <span>Rodzaj zadania</span>
           <span class="checkbox-wiersz"><input name="okresowe" type="checkbox" value="tak"> ↻ Zadanie okresowe</span>
