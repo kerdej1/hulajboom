@@ -690,3 +690,19 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .pole > span.checkbox-wiersz { font-weight: 400; color: var(--tekst); margin: 0; }
 .checkbox-wiersz { display: flex; align-items: center; gap: 8px; font-size: 14px; padding: 8px 0; cursor: pointer; }
 .przelacznik-okres > span:first-child { font-size: 13px; font-weight: 600; color: var(--szary); }
+
+/* ----- Kolor = intensywność (karty w terminarzu i kafelki) ----- */
+.karta.p-luz, .kafelek.p-luz { border-left-color: var(--i-luz); }
+.karta.p-spokojnie, .kafelek.p-spokojnie { border-left-color: var(--i-spokojnie); }
+.karta.p-pora, .kafelek.p-pora { border-left-color: var(--i-pora); }
+.karta.p-pilne, .kafelek.p-pilne { border-left-color: var(--i-pilne); }
+.karta.p-krytyczne, .kafelek.p-krytyczne { border-left-color: var(--i-krytyczne); }
+.karta.p-okresowe, .kafelek.p-okresowe, .karta.p-zrobione, .kafelek.p-zrobione { border-left-color: var(--i-okresowe); }
+.karta.p-okresowe, .kafelek.p-okresowe { background: #f6f6f4; }
+/* ważność jako wykrzykniki */
+.waga { font-weight: 800; letter-spacing: -1px; margin-right: 1px; }
+.waga-wysoki { color: #c92a2a; }
+.waga-sredni { color: #868e96; }
+.waga-niski { color: #ced4da; }
+.kropki-praca { gap: 3px; margin-top: auto; }
+.kropki-praca .kropka-kal.sesja { width: 7px; height: 7px; border-width: 1.5px; border-color: #91a7ff; }

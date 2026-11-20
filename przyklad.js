@@ -14,42 +14,132 @@ window.PRZYKLADOWE_DANE = {
     },
     {
       "id": 2,
+      "tytul": "Sprawozdanie z elektroniki",
+      "opis": "Pomiary z laboratorium nr 4, wykresy i wnioski",
+      "termin": "2026-11-24",
+      "priorytet": "wysoki",
+      "wykonane": false,
+      "tagi": ["studia", "⏱15d"]
+    },
+    {
+      "id": 3,
+      "tytul": "Esej z filozofii",
+      "opis": "Temat: wolna wola, 8–10 stron",
+      "termin": "2026-11-23",
+      "priorytet": "sredni",
+      "wykonane": false,
+      "tagi": ["studia", "⏱8d"]
+    },
+    {
+      "id": 4,
       "tytul": "Projekt z baz danych – etap 1",
       "opis": "Diagram ERD i skrypt tworzący tabele",
       "termin": "2026-11-25",
       "priorytet": "wysoki",
       "wykonane": false,
-      "tagi": ["studia", "projekt", "⏱10d"]
-    },
-    {
-      "id": 3,
-      "tytul": "Zakupy spożywcze",
-      "opis": "Mleko, chleb, jajka, makaron",
-      "termin": "2026-11-21",
-      "priorytet": "sredni",
-      "wykonane": false,
-      "tagi": ["dom", "okresowe"]
-    },
-    {
-      "id": 4,
-      "tytul": "Zapłacić za akademik",
-      "opis": "",
-      "termin": "2026-11-30",
-      "priorytet": "wysoki",
-      "wykonane": false,
-      "tagi": ["finanse", "okresowe"]
+      "tagi": ["studia", "projekt", "⏱6d"]
     },
     {
       "id": 5,
+      "tytul": "Kolokwium z fizyki",
+      "opis": "Kinematyka i dynamika",
+      "termin": "2026-11-27",
+      "priorytet": "wysoki",
+      "wykonane": false,
+      "tagi": ["studia", "⏱3d"]
+    },
+    {
+      "id": 6,
+      "tytul": "Obejrzeć wykład z systemów operacyjnych",
+      "opis": "Nagranie z 13.11 – procesy i wątki",
+      "termin": "2026-11-23",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["studia", "⏱1d"]
+    },
+    {
+      "id": 7,
+      "tytul": "Wysłać CV na staż",
+      "opis": "Oferta: junior developer, praca zdalna",
+      "termin": "2026-12-01",
+      "priorytet": "sredni",
+      "wykonane": false,
+      "tagi": ["praca", "⏱2d"]
+    },
+    {
+      "id": 8,
+      "tytul": "Prezentacja na seminarium",
+      "opis": "Temat: bezpieczeństwo aplikacji webowych, 15 minut",
+      "termin": "2026-12-03",
+      "priorytet": "wysoki",
+      "wykonane": false,
+      "tagi": ["studia", "projekt", "⏱20d"]
+    },
+    {
+      "id": 9,
+      "tytul": "Urodziny Kasi – kupić prezent",
+      "opis": "Lubi książki fantasy",
+      "termin": "2026-12-05",
+      "priorytet": "sredni",
+      "wykonane": false,
+      "tagi": ["znajomi", "⏱1d"]
+    },
+    {
+      "id": 10,
+      "tytul": "Praca semestralna z ekonomii",
+      "opis": "Analiza rynku pracy w IT, min. 15 stron",
+      "termin": "2026-12-08",
+      "priorytet": "sredni",
+      "wykonane": false,
+      "tagi": ["studia", "⏱28d"]
+    },
+    {
+      "id": 11,
+      "tytul": "Projekt zespołowy – aplikacja mobilna",
+      "opis": "Etap końcowy: testy i dokumentacja",
+      "termin": "2026-12-10",
+      "priorytet": "wysoki",
+      "wykonane": false,
+      "tagi": ["studia", "projekt", "⏱24d"]
+    },
+    {
+      "id": 12,
+      "tytul": "Egzamin z matematyki dyskretnej",
+      "opis": "Grafy, kombinatoryka, relacje",
+      "termin": "2026-12-15",
+      "priorytet": "wysoki",
+      "wykonane": false,
+      "tagi": ["studia", "egzamin", "⏱14d"]
+    },
+    {
+      "id": 13,
       "tytul": "Przeczytać artykuł o algorytmach sortowania",
       "opis": "Link na stronie przedmiotu",
       "termin": null,
       "priorytet": "niski",
       "wykonane": false,
-      "tagi": ["studia", "⏱0.5d"]
+      "tagi": ["studia"]
     },
     {
-      "id": 6,
+      "id": 14,
+      "tytul": "Zrobić kopię zapasową laptopa",
+      "opis": "",
+      "termin": null,
+      "priorytet": "sredni",
+      "wykonane": false,
+      "tagi": []
+    },
+    {
+      "id": 15,
+      "tytul": "Umówić wizytę u dentysty",
+      "opis": "",
+      "termin": null,
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": []
+    },
+    {
+      "id": 16,
       "tytul": "Laboratorium z programowania – sprawozdanie",
       "opis": "Lab 6: wskaźniki i tablice dynamiczne",
       "termin": "2026-11-22",
@@ -58,103 +148,13 @@ window.PRZYKLADOWE_DANE = {
       "tagi": ["studia", "⏱1d"]
     },
     {
-      "id": 7,
-      "tytul": "Siłownia",
-      "opis": "Trening nóg",
-      "termin": "2026-11-20",
-      "priorytet": "niski",
-      "wykonane": false,
-      "tagi": ["sport", "okresowe"]
-    },
-    {
-      "id": 8,
-      "tytul": "Egzamin z matematyki dyskretnej",
-      "opis": "Grafy, kombinatoryka, relacje",
-      "termin": "2026-12-15",
-      "priorytet": "wysoki",
-      "wykonane": false,
-      "tagi": ["studia", "egzamin", "⏱10d"]
-    },
-    {
-      "id": 9,
+      "id": 17,
       "tytul": "Oddać książki do biblioteki",
       "opis": "",
       "termin": "2026-11-19",
       "priorytet": "sredni",
       "wykonane": true,
       "tagi": []
-    },
-    {
-      "id": 10,
-      "tytul": "Zadzwonić do mamy",
-      "opis": "",
-      "termin": null,
-      "priorytet": "niski",
-      "wykonane": false,
-      "tagi": ["rodzina", "okresowe"]
-    },
-    {
-      "id": 11,
-      "tytul": "Prezentacja na seminarium",
-      "opis": "Temat: bezpieczeństwo aplikacji webowych, 15 minut",
-      "termin": "2026-12-03",
-      "priorytet": "wysoki",
-      "wykonane": false,
-      "tagi": ["studia", "projekt", "⏱15d"]
-    },
-    {
-      "id": 12,
-      "tytul": "Posprzątać pokój",
-      "opis": "Odkurzyć i wynieść śmieci",
-      "termin": "2026-11-22",
-      "priorytet": "niski",
-      "wykonane": false,
-      "tagi": ["dom", "okresowe"]
-    },
-    {
-      "id": 13,
-      "tytul": "Kupić bilet miesięczny",
-      "opis": "Bilet studencki na grudzień",
-      "termin": "2026-11-30",
-      "priorytet": "sredni",
-      "wykonane": false,
-      "tagi": ["finanse", "okresowe"]
-    },
-    {
-      "id": 14,
-      "tytul": "Kolokwium z fizyki",
-      "opis": "Kinematyka i dynamika",
-      "termin": "2026-11-27",
-      "priorytet": "wysoki",
-      "wykonane": false,
-      "tagi": ["studia", "⏱10d"]
-    },
-    {
-      "id": 15,
-      "tytul": "Zrobić kopię zapasową laptopa",
-      "opis": "",
-      "termin": null,
-      "priorytet": "sredni",
-      "wykonane": false,
-      "tagi": ["⏱0.5d"]
-    },
-    {
-      "id": 16,
-      "tytul": "Wysłać CV na staż",
-      "opis": "Oferta: junior developer, praca zdalna",
-      "termin": "2026-12-01",
-      "priorytet": "wysoki",
-      "wykonane": false,
-      "tagi": ["praca", "⏱2d"]
-    },
-    {
-      "id": 17,
-      "tytul": "Urodziny Kasi – kupić prezent",
-      "opis": "Lubi książki fantasy",
-      "termin": "2026-12-05",
-      "priorytet": "sredni",
-      "wykonane": false,
-      "tagi": ["znajomi"]
     },
     {
       "id": 18,
@@ -167,21 +167,102 @@ window.PRZYKLADOWE_DANE = {
     },
     {
       "id": 19,
-      "tytul": "Obejrzeć wykład z systemów operacyjnych",
-      "opis": "Nagranie z 13.11 – procesy i wątki",
-      "termin": "2026-11-23",
+      "tytul": "Siłownia",
+      "opis": "Trening nóg",
+      "termin": "2026-11-20",
       "priorytet": "niski",
       "wykonane": false,
-      "tagi": ["studia", "⏱1d"]
+      "tagi": ["sport", "okresowe"]
     },
     {
       "id": 20,
-      "tytul": "Umówić wizytę u dentysty",
+      "tytul": "Zakupy spożywcze",
+      "opis": "Mleko, chleb, jajka, makaron",
+      "termin": "2026-11-21",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["dom", "okresowe"]
+    },
+    {
+      "id": 21,
+      "tytul": "Posprzątać pokój",
+      "opis": "Odkurzyć i wynieść śmieci",
+      "termin": "2026-11-22",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["dom", "okresowe"]
+    },
+    {
+      "id": 22,
+      "tytul": "Siłownia",
+      "opis": "Trening góry",
+      "termin": "2026-11-24",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["sport", "okresowe"]
+    },
+    {
+      "id": 23,
+      "tytul": "Pranie",
+      "opis": "",
+      "termin": "2026-11-25",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["dom", "okresowe"]
+    },
+    {
+      "id": 24,
+      "tytul": "Siłownia",
+      "opis": "Trening nóg",
+      "termin": "2026-11-27",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["sport", "okresowe"]
+    },
+    {
+      "id": 25,
+      "tytul": "Basen",
+      "opis": "",
+      "termin": "2026-11-29",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["sport", "okresowe"]
+    },
+    {
+      "id": 26,
+      "tytul": "Zapłacić za akademik",
+      "opis": "",
+      "termin": "2026-11-30",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["finanse", "okresowe"]
+    },
+    {
+      "id": 27,
+      "tytul": "Kupić bilet miesięczny",
+      "opis": "Bilet studencki na grudzień",
+      "termin": "2026-11-30",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["finanse", "okresowe"]
+    },
+    {
+      "id": 28,
+      "tytul": "Zakupy spożywcze",
+      "opis": "",
+      "termin": "2026-11-28",
+      "priorytet": "niski",
+      "wykonane": false,
+      "tagi": ["dom", "okresowe"]
+    },
+    {
+      "id": 29,
+      "tytul": "Zadzwonić do mamy",
       "opis": "",
       "termin": null,
       "priorytet": "niski",
       "wykonane": false,
-      "tagi": []
+      "tagi": ["rodzina", "okresowe"]
     }
   ]
 };
