@@ -1310,6 +1310,33 @@ oknoProfil.addEventListener('submit', e => {
 // okna nie da się zamknąć klawiszem Esc przy pierwszym wejściu bez wyboru – wtedy liczymy jak "Pomiń"
 oknoProfil.addEventListener('cancel', () => { if (!profil) { profil = { styl: 'domyslne', punkty: DOMYSLNE_PUNKTY.slice() }; zapiszLokalnie(); } });
 
+/* ---------- Dymek z uwagami ("!") ----------
+   Ustawiamy go względem ekranu (position: fixed), żeby nie przycinało go
+   okno szczegółów. Domyślnie nad wykrzyknikiem, a gdy brak miejsca – pod nim. */
+function pokazDymek(uwaga) {
+  const dymek = uwaga.querySelector('.uwaga-dymek');
+  if (!dymek) return;
+  dymek.style.display = 'block';
+  const r = uwaga.getBoundingClientRect();
+  const d = dymek.getBoundingClientRect();
+  const margines = 8;
+  let top = r.top - d.height - margines;
+  if (top < margines) top = r.bottom + margines;                       // brak miejsca u góry → pod spodem
+  top = Math.min(top, window.innerHeight - d.height - margines);
+  let left = r.left + r.width / 2 - d.width / 2;
+  left = Math.max(margines, Math.min(left, window.innerWidth - d.width - margines));
+  dymek.style.top = `${Math.max(margines, top)}px`;
+  dymek.style.left = `${left}px`;
+}
+function schowajDymek(uwaga) {
+  const dymek = uwaga.querySelector('.uwaga-dymek');
+  if (dymek) dymek.style.display = '';
+}
+document.addEventListener('mouseover', e => { const u = e.target.closest('.uwaga'); if (u) pokazDymek(u); });
+document.addEventListener('mouseout', e => { const u = e.target.closest('.uwaga'); if (u && !u.contains(e.relatedTarget)) schowajDymek(u); });
+document.addEventListener('focusin', e => { const u = e.target.closest('.uwaga'); if (u) pokazDymek(u); });
+document.addEventListener('focusout', e => { const u = e.target.closest('.uwaga'); if (u) schowajDymek(u); });
+
 /* =====================================================================
    Powiadomienia (z przyciskiem "Cofnij")
    ===================================================================== */

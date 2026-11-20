@@ -739,17 +739,18 @@ button.kropka-kal:hover { transform: scale(1.35); }
 .uwaga.powazna { background: var(--i-pilne); }
 .uwaga-dymek {
   display: none;
-  position: absolute; z-index: 40;
-  bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-  width: max-content; max-width: 280px;
+  /* fixed: dymek nie jest przycinany przez okno szczegółów (pozycję liczy JS) */
+  position: fixed; z-index: 1000;
+  top: 0; left: 0;
+  width: max-content; max-width: min(300px, calc(100vw - 16px));
   background: #1f2328; color: #fff; text-align: left;
   font-size: 12px; font-weight: 400; line-height: 1.4;
   padding: 8px 10px; border-radius: 8px;
-  box-shadow: 0 6px 20px rgba(0,0,0,.2);
+  box-shadow: 0 6px 20px rgba(0,0,0,.25);
+  pointer-events: none;
 }
 .uwaga-dymek span { display: block; }
 .uwaga-dymek span + span { margin-top: 6px; }
-.uwaga:hover .uwaga-dymek, .uwaga:focus .uwaga-dymek { display: block; }
 
 /* ----- Styl pracy (pierwsze wejście) ----- */
 .okno-profil { width: min(720px, 94vw); }
