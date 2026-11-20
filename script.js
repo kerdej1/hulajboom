@@ -1031,7 +1031,7 @@ function widokTerminarz() {
       </div>
       <strong class="term-tytul">${esc(tytul)}</strong>
       <label class="pokaz-zrobione">
-        <input type="checkbox" data-akcja="pokaz-sesje" ${terminarz.pokazSesje ? 'checked' : ''}> Dni pracy
+        <input type="checkbox" data-akcja="pokaz-sesje" ${terminarz.pokazSesje ? 'checked' : ''}> Zaplanowane sesje
       </label>
       ${htmlPrzyciskuLegendy()}
     </div>`;
