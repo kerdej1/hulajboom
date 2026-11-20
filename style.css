@@ -896,3 +896,88 @@ h1 { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
   background: var(--tusz); color: #fff; font-size: 11px; font-weight: 600; vertical-align: middle;
 }
 .obecny-profil { background: #f6f6f4; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; }
+
+/* ----- Legenda (przycisk + panel) ----- */
+.legenda-kotwica { position: relative; display: inline-flex; }
+.legenda-przycisk.aktywny { background: var(--akcent-jasny); border-color: #c7d2fe; color: var(--akcent); }
+.legenda-panel {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 30;
+  width: 340px; max-width: calc(100vw - 32px);
+  background: #fff; border: 1px solid var(--linia); border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(24,24,27,.16); padding: 14px 16px; text-align: left;
+}
+.legenda-gora { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.legenda-panel h4 { margin: 12px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--szary); }
+.legenda-panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 13px; }
+.legenda-panel li { display: grid; grid-template-columns: 22px auto 1fr; align-items: center; gap: 4px 8px; }
+.legenda-panel li > span:last-child { color: var(--szary); font-size: 12px; }
+.legenda-panel .kropka-kal { cursor: default; justify-self: center; }
+.legenda-panel .legenda-tekst li { display: list-item; list-style: disc; margin-left: 18px; color: var(--szary); }
+.term-pasek .legenda-kotwica, .filtry .legenda-kotwica { margin-left: auto; }
+.term-tytul { margin-right: 0; }
+
+/* =====================================================================
+   SZATA GRAFICZNA v2 – nadal minimalistyczna, ale z charakterem:
+   delikatne tło z gradientem, akcent indygo, miękkie cienie, kolorowe
+   tła kafelków zależne od intensywności.
+   ===================================================================== */
+:root {
+  --tlo: #f6f6fb;
+  --akcent: #4f46e5;
+  --akcent-jasny: #eef2ff;
+  --cien: 0 1px 2px rgba(30,27,75,.05), 0 6px 20px rgba(30,27,75,.06);
+}
+body {
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(99,102,241,.10), transparent 60%),
+    radial-gradient(900px 400px at -10% 10%, rgba(16,185,129,.06), transparent 60%),
+    var(--tlo);
+  background-attachment: fixed;
+}
+.gora { background: rgba(255,255,255,.72); }
+.logo-znak {
+  background: linear-gradient(135deg, #6366f1, #4338ca);
+  box-shadow: 0 4px 12px rgba(79,70,229,.35);
+}
+h1 { font-weight: 700; }
+.przycisk.glowny {
+  background: linear-gradient(135deg, #6366f1, #4338ca); border-color: transparent;
+  box-shadow: 0 4px 12px rgba(79,70,229,.25);
+}
+.przycisk.glowny:hover { background: linear-gradient(135deg, #5b5ff0, #3730a3); }
+.zakladka.aktywna { background: var(--tusz); box-shadow: 0 4px 12px rgba(24,24,27,.18); }
+.przelacznik button.wl { color: var(--akcent); }
+
+/* kalendarz */
+.dzien-kal { background: #fff; box-shadow: var(--cien); border-color: #ececf3; }
+.dzien-kal.przeszly { background: rgba(255,255,255,.5); box-shadow: none; }
+.dzien-kal.poza { background: transparent; box-shadow: none; }
+.dzien-kal.dzisiaj { border-color: var(--akcent); box-shadow: 0 0 0 2px var(--akcent) inset, 0 8px 24px rgba(79,70,229,.15); }
+.dzisiaj .kal-dzien, .dzisiaj .kal-nr { color: var(--akcent); }
+.kal-tydzien .dzien-kal.dzisiaj .kal-gora { background: var(--akcent-jasny); margin: -8px -8px 0; padding: 8px 8px 6px; border-radius: 10px 10px 0 0; }
+.sesja-kal { background: #f5f5ff; border-color: #dcdcfb; }
+.sesja-znak { border-color: var(--akcent); }
+
+/* karty i kafelki – lekko zabarwione kolorem intensywności */
+.karta, .kafelek { box-shadow: 0 1px 2px rgba(30,27,75,.04); }
+.karta.p-luz, .kafelek.p-luz { background: color-mix(in srgb, var(--i-luz) 6%, #fff); }
+.karta.p-spokojnie, .kafelek.p-spokojnie { background: color-mix(in srgb, var(--i-spokojnie) 8%, #fff); }
+.karta.p-pora, .kafelek.p-pora { background: color-mix(in srgb, var(--i-pora) 7%, #fff); }
+.karta.p-pilne, .kafelek.p-pilne { background: color-mix(in srgb, var(--i-pilne) 6%, #fff); }
+.karta.p-krytyczne, .kafelek.p-krytyczne { background: color-mix(in srgb, var(--i-krytyczne) 7%, #fff); }
+.kafelek:hover { box-shadow: 0 8px 24px rgba(30,27,75,.10); }
+
+/* kolumny */
+.kol { background: rgba(255,255,255,.55); border: 1px solid #ececf3; backdrop-filter: blur(4px); }
+.kol-gora .licznik { background: #fff; border: 1px solid #ececf3; }
+.kol-nazwa::before { width: 10px; height: 10px; box-shadow: 0 0 0 3px rgba(0,0,0,.04); }
+
+/* okna */
+.okno { border: 1px solid #ececf3; }
+.okno-profil .profil-tresc h2, .szcz h2 { letter-spacing: -0.01em; }
+.styl-przycisk, .tabela-profil { box-shadow: 0 1px 2px rgba(30,27,75,.04); }
+.styl-przycisk.wybrany, .tabela-profil.wybrany, .wlasne-profil.wybrany { border-color: var(--akcent); }
+.znacznik-wybrane { background: var(--akcent); }
+.obecny-profil { background: var(--akcent-jasny); color: #312e81; }
+.podglad-planu { background: var(--akcent-jasny); }
+.pusto { background: rgba(255,255,255,.7); border-color: #dcdcf0; }

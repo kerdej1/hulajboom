@@ -765,6 +765,7 @@ function widokWszystkie() {
         <input type="checkbox" data-akcja="pokaz-zrobione" ${filtry.pokazZrobione ? 'checked' : ''}>
         Pokaż zrobione (${ileZrobionych})
       </label>
+      ${htmlPrzyciskuLegendy()}
     </div>`;
 
   if (!dane.zadania.length) {
@@ -773,8 +774,47 @@ function widokWszystkie() {
       <button class="przycisk" data-akcja="wczytaj">Wczytaj plik JSON</button></div>`;
   }
   return pasek + `<div class="tablica">${kolumny.join('')}</div>
-    <p class="maly-tekst tydzien-stopka">Kolor paska = intensywność, !!! / !! / ! = ważność. W kolumnie zadania są ułożone według terminu. Kliknij kafelek, aby zobaczyć szczegóły.</p>`;
+`;
 }
+
+/* ---------- Legenda (mały przycisk zamiast tekstu na dole) ---------- */
+let legendaOtwarta = false;
+function htmlPrzyciskuLegendy() {
+  return `<span class="legenda-kotwica">
+    <button type="button" class="przycisk maly legenda-przycisk ${legendaOtwarta ? 'aktywny' : ''}" data-akcja="legenda" aria-expanded="${legendaOtwarta}">ⓘ Legenda</button>
+    ${legendaOtwarta ? htmlLegendy() : ''}
+  </span>`;
+}
+function htmlLegendy() {
+  const pr = progiPoziomow();
+  const poziomy = POZIOMY.map((p, i) => `<li><i class="kropka-kal ${p.klucz}"></i><b>${p.nazwa}</b>
+    <span>${i < 4 ? `zostało ≥ ${proc(pr[i])} potrzebnego czasu` : `mniej niż ${proc(pr[3])}`}</span></li>`).join('');
+  return `
+    <div class="legenda-panel" role="dialog" aria-label="Legenda">
+      <div class="legenda-gora"><b>Legenda</b><button type="button" class="ikona" data-akcja="legenda" aria-label="Zamknij">✕</button></div>
+      <h4>Intensywność (kolor kropki i paska)</h4>
+      <ul>${poziomy}</ul>
+      <h4>Rodzaje i znaczki</h4>
+      <ul>
+        <li><i class="kropka-kal okresowe"></i><b>Okresowe ↻</b><span>siłownia, zakupy – bez priorytetu</span></li>
+        <li><span class="kropka-kal akcja">🛴</span><b>Pojedyncza akcja</b><span>np. zakup pralki</span></li>
+        <li><i class="kropka-kal sesja"></i><b>Sesja pracy</b><span>zaplanowany dzień nauki / pracy</span></li>
+        <li><span class="waga waga-wysoki">!!!</span><b>Ważność</b><span>!!! wysoka · !! średnia · ! niska</span></li>
+        <li><span class="uwaga" style="cursor:default">!</span><b>Uwaga do planu</b><span>najedź, aby przeczytać</span></li>
+        <li><span>🧠</span><b>Zapamiętanie</b><span>przewidywane z krzywej zapominania</span></li>
+      </ul>
+      <h4>Jak używać</h4>
+      <ul class="legenda-tekst">
+        <li>Kliknij zadanie, kropkę lub kafelek – zobaczysz szczegóły.</li>
+        <li>Kółko przy zadaniu – oznacz jako zrobione.</li>
+        <li>Puste miejsce w dniu – wykreśl dzień (np. wakacje), plan się ściśnie.</li>
+      </ul>
+    </div>`;
+}
+document.addEventListener('click', e => {
+  // kliknięcie poza legendą ją zamyka
+  if (legendaOtwarta && !e.target.closest('.legenda-kotwica')) { legendaOtwarta = false; odswiez(); }
+}, true);
 
 /* ---------- Okno szczegółów zadania ---------- */
 const oknoSzczegoly = document.getElementById('szczegoly');
@@ -993,16 +1033,12 @@ function widokTerminarz() {
       <label class="pokaz-zrobione">
         <input type="checkbox" data-akcja="pokaz-sesje" ${terminarz.pokazSesje ? 'checked' : ''}> Dni pracy
       </label>
+      ${htmlPrzyciskuLegendy()}
     </div>`;
 
   const naglowkiDni = tryb === 'tydzien' ? '' : `<div class="kal-naglowki">${NAZWY_DNI.map(n => `<span>${n}</span>`).join('')}</div>`;
   const komorki = Object.entries(mapa).map(([d, info]) => htmlDniaKal(d, info, tryb, zakres)).join('');
 
-  const legenda = tryb === 'miesiac'
-    ? `<span class="legenda">${POZIOMY.map(p => `<i class="kropka-kal ${p.klucz}"></i> ${p.nazwa.toLowerCase()}`).join(' ')}
-       <i class="kropka-kal okresowe"></i> okresowe <span class="kropka-kal akcja">🛴</span> akcja
-       ${terminarz.pokazSesje ? '<i class="kropka-kal sesja"></i> dzień pracy' : ''}</span> Kliknij kropkę lub kwadrat, aby zobaczyć zadanie, a puste miejsce w dniu – aby go wykreślić (np. wakacje).`
-    : 'Kolor paska = intensywność (zielony luz → fioletowy krytyczne, szary ↻ = okresowe, 🛴 = pojedyncza akcja), !!! / !! / ! = ważność. Kliknij zadanie, aby zobaczyć szczegóły, a kółko – aby je odhaczyć. Dni pracy są w przerywanej ramce. Kliknij puste miejsce w dniu, aby go wykreślić (np. wakacje) – plan się wtedy ściśnie.';
   const bezTerminu = dane.zadania.filter(z => !z.wykonane && !z.termin).length;
 
   const pusty = dane.zadania.length ? '' : `<div class="pusto" style="margin-bottom:14px">Kalendarz jest pusty.<br>
@@ -1010,8 +1046,7 @@ function widokTerminarz() {
       <button class="przycisk" data-akcja="nowe">+ Dodaj zadanie</button></div>`;
   return pusty + pasekNarzedzi + naglowkiDni +
     `<div class="kal kal-${tryb}">${komorki}</div>
-     <p class="maly-tekst tydzien-stopka">${legenda}
-       ${bezTerminu ? ` · Bez terminu: ${bezTerminu} zad. <button class="link" data-widok="wszystkie">zobacz →</button>` : ''}</p>`;
+     ${bezTerminu ? `<p class="maly-tekst tydzien-stopka">Bez terminu: ${bezTerminu} zad. <button class="link" data-widok="wszystkie">zobacz →</button></p>` : ''}`;
 }
 
 /* =====================================================================
@@ -1637,6 +1672,7 @@ document.addEventListener('click', e => {
     case 'zapisz': zapiszDoPliku(); break;
     case 'anuluj': okno.close(); break;
     case 'zamknij-dzien': oknoDnia.close(); break;
+    case 'legenda': legendaOtwarta = !legendaOtwarta; odswiez(); break;
     case 'wyczysc': document.getElementById('form-wyczysc').reset(); oknoWyczysc.showModal(); break;
     case 'zamknij-wyczysc': oknoWyczysc.close(); break;
     case 'profil': otworzProfil(); break;
