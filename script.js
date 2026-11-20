@@ -28,8 +28,9 @@ const WAGA_PRIORYTETU = { niski: 1, sredni: 2, wysoki: 3 };
 const DOMYSLNY_CZAS = { wysoki: 3, sredni: 2, niski: 1 };
 const ZNAK_WAZNOSCI = { wysoki: '!!!', sredni: '!!', niski: '!' };
 
-// 5 poziomów intensywności. Liczymy, jaka część potrzebnego czasu pracy (x) została do terminu:
-// ≥ 100% x → Luz, potem co 23,3 punktu procentowego w dół.
+// 5 poziomów intensywności. Liczymy, jaka część potrzebnego czasu pracy (x) została do terminu.
+// Progi ("od") są domyślne: ≥ 100% x → Luz, potem co 23,3 punktu procentowego w dół.
+// Użytkownik może je zmienić w panelu "Mój styl pracy" (funkcja progiPoziomow).
 const POZIOMY = [
   { klucz: 'luz', nazwa: 'Luz', od: 1.0 },
   { klucz: 'spokojnie', nazwa: 'Spokojnie', od: 0.767 },
@@ -390,7 +391,9 @@ function wskaznikCzasu(z) {
 function poziom(z) {
   if (czyOkresowe(z)) return 'okresowe';
   const w = wskaznikCzasu(z);
-  return POZIOMY.find(p => w >= p.od).klucz;
+  const progi = progiPoziomow();
+  for (let i = 0; i < progi.length; i++) if (w >= progi[i]) return POZIOMY[i].klucz;
+  return 'krytyczne';
 }
 function opisWskaznika(z) {
   const w = wskaznikCzasu(z);
@@ -664,11 +667,11 @@ function porownajWaznosc(a, b) {
 /* ---------- Wszystkie zadania: kolumny z kafelkami ---------- */
 const KOLUMNY = {
   poziom: [
-    { klucz: 'krytyczne', nazwa: 'Krytyczne', opis: 'mniej niż 30% potrzebnego czasu' },
-    { klucz: 'pilne', nazwa: 'Pilne', opis: '30–53% potrzebnego czasu' },
-    { klucz: 'pora', nazwa: 'Pora zaczynać', opis: '53–77% potrzebnego czasu' },
-    { klucz: 'spokojnie', nazwa: 'Spokojnie', opis: '77–100% potrzebnego czasu' },
-    { klucz: 'luz', nazwa: 'Luz', opis: 'czasu jest tyle, ile trzeba, albo więcej' },
+    { klucz: 'krytyczne', nazwa: 'Krytyczne' },
+    { klucz: 'pilne', nazwa: 'Pilne' },
+    { klucz: 'pora', nazwa: 'Pora zaczynać' },
+    { klucz: 'spokojnie', nazwa: 'Spokojnie' },
+    { klucz: 'luz', nazwa: 'Luz' },
   ],
   waznosc: [
     { klucz: 'wysoki', nazwa: 'Wysoka ważność', opis: 'priorytet wysoki' },
@@ -725,7 +728,7 @@ function widokWszystkie() {
   const grupa = filtry.grupuj === 'waznosc' ? (z => z.priorytet) : poziom;
   const zwykle = aktywne.filter(z => !czyOkresowe(z));
   const kolumny = KOLUMNY[filtry.grupuj].map(k =>
-    htmlKolumny(k.klucz, k.nazwa, k.opis, zwykle.filter(z => grupa(z) === k.klucz)));
+    htmlKolumny(k.klucz, k.nazwa, k.opis || opisProgu(k.klucz), zwykle.filter(z => grupa(z) === k.klucz)));
   // zadania okresowe nie mają priorytetu ani poziomu – osobna, szara kolumna
   kolumny.push(htmlKolumny('okresowe', 'Okresowe', 'siłownia, zakupy, opłaty… – bez priorytetu', aktywne.filter(czyOkresowe)));
   if (filtry.pokazZrobione) kolumny.push(htmlKolumny('zrobione', 'Zrobione', 'odhaczone zadania', zrobione));
@@ -1280,8 +1283,55 @@ const STYLE = {
     tabele: [[4, 16, 110], [5, 18, 130], [6, 22, 160]],
   },
 };
+/* ---------- Progi intensywności (kiedy luz, a kiedy krytycznie) ----------
+   Podajemy dwa progi (w % potrzebnego czasu): od ilu zaczyna się Luz
+   i poniżej ilu jest Krytycznie. Trzy środkowe poziomy dzielą przedział po równo. */
+const SZABLONY_PROGOW = {
+  ostrozny: { nazwa: 'Ostrożny', opis: 'Wolę mieć duży zapas – ostrzegaj mnie wcześnie.', luz: 1.5, kryt: 0.6 },
+  zrownowazony: { nazwa: 'Zrównoważony', opis: 'Luz, gdy czasu jest tyle, ile trzeba.', luz: 1.0, kryt: 0.301 },
+  presja: { nazwa: 'Na ostatnią chwilę', opis: 'Dobrze działam pod presją – nie panikuj za wcześnie.', luz: 0.7, kryt: 0.15 },
+};
+const DOMYSLNE_PROGI = { luz: 1.0, kryt: 0.301 };
+
+function poprawneProgi(p) {
+  return p && typeof p.luz === 'number' && typeof p.kryt === 'number' && p.kryt > 0 && p.luz > p.kryt;
+}
+function progiUzytkownika() {
+  return profil && poprawneProgi(profil.progi) ? profil.progi : DOMYSLNE_PROGI;
+}
+/** Progi "od" dla: luz, spokojnie, pora, pilne (krytyczne = poniżej ostatniego). */
+function progiPoziomow(p = progiUzytkownika()) {
+  const krok = (p.luz - p.kryt) / 3;
+  return [p.luz, p.luz - krok, p.luz - 2 * krok, p.kryt];
+}
+function proc(v) { return `${Math.round(v * 100)}%`; }
+function opisProgu(klucz) {
+  const [l, s, pr, pi] = progiPoziomow();
+  return {
+    luz: `co najmniej ${proc(l)} potrzebnego czasu`,
+    spokojnie: `${proc(s)}–${proc(l)} potrzebnego czasu`,
+    pora: `${proc(pr)}–${proc(s)} potrzebnego czasu`,
+    pilne: `${proc(pi)}–${proc(pr)} potrzebnego czasu`,
+    krytyczne: `mniej niż ${proc(pi)} potrzebnego czasu`,
+  }[klucz];
+}
+function dniPrzyklad(v) { return String(Math.round(v * 10 * 10) / 10).replace('.', ','); }
+
+function htmlSzablonuProgow(klucz, sz) {
+  const pr = progiPoziomow(sz);
+  const wiersze = POZIOMY.map((p, i) => `<tr><td><i class="kropka-kal ${p.klucz}"></i> ${p.nazwa}</td>
+    <td>${i < 4 ? '≥ ' + proc(pr[i]) : '< ' + proc(pr[3])}</td></tr>`).join('');
+  return `
+    <button type="button" class="tabela-profil" data-akcja="wybierz-progi" data-szablon="${klucz}">
+      <span class="tabela-naglowek">${sz.nazwa}</span>
+      <span class="maly-tekst">${sz.opis}</span>
+      <table class="tabela-progow">${wiersze}</table>
+      <span class="maly-tekst">Zadanie na 10 dni: luz, gdy do terminu ≥ ${dniPrzyklad(sz.luz)} dni; krytycznie poniżej ${dniPrzyklad(sz.kryt)} dni.</span>
+    </button>`;
+}
+
 const oknoProfil = document.getElementById('okno-profil');
-let krokProfilu = { styl: null };
+let krokProfilu = { grupa: null, styl: null, krok: 1, punkty: null };
 
 function poprawnePunkty(p) {
   return Array.isArray(p) && p.length === 3 && p.every(v => typeof v === 'number' && v > 0)
@@ -1301,7 +1351,33 @@ function htmlTabeli(punkty, i) {
 
 function rysujProfil() {
   const el = document.getElementById('profil-tresc');
-  if (!krokProfilu.styl) {
+  if (krokProfilu.krok === 3) {
+    const teraz = progiUzytkownika();
+    el.innerHTML = `
+      <h2>Kiedy jest dla Ciebie luz, a kiedy krytycznie?</h2>
+      <p class="maly-tekst">Intensywność zadania zależy od tego, jaka część potrzebnego czasu została do terminu.
+        Każdy odczuwa to inaczej – wybierz, co do Ciebie pasuje.</p>
+      <div class="tabele-profil">${Object.entries(SZABLONY_PROGOW).map(([k, sz]) => htmlSzablonuProgow(k, sz)).join('')}</div>
+      <details class="wlasne-profil">
+        <summary>Wpiszę własne progi</summary>
+        <form id="form-progi" class="wlasne-pola progi-pola">
+          <label class="pole"><span>Luz od (% potrzebnego czasu)</span>
+            <input name="luz" type="number" min="1" step="1" value="${Math.round(teraz.luz * 100)}"></label>
+          <label class="pole"><span>Krytycznie poniżej (%)</span>
+            <input name="kryt" type="number" min="1" step="1" value="${Math.round(teraz.kryt * 100)}"></label>
+          <button type="submit" class="przycisk glowny">Zapisz własne</button>
+          <small class="podpowiedz" style="grid-column: 1 / -1">Pośrednie poziomy (spokojnie, pora zaczynać, pilne) dzielą ten przedział po równo.</small>
+          <small class="blad" id="blad-progi"></small>
+        </form>
+      </details>
+      <div class="okno-stopka">
+        <button type="button" class="przycisk" data-akcja="wstecz-profil">← Wstecz</button>
+        <span style="flex:1"></span>
+        <button type="button" class="przycisk" data-akcja="wybierz-progi" data-szablon="zrownowazony">Pomiń (zrównoważony)</button>
+      </div>`;
+    return;
+  }
+  if (krokProfilu.krok === 1 || !krokProfilu.grupa) {
     el.innerHTML = `
       <h2>Dopasujmy plan do Ciebie</h2>
       <p class="maly-tekst">Szacujesz zadania w dniach (np. „kolokwium – 3 dni”). Żeby wiedzieć, ile to godzin czystej pracy,
@@ -1313,11 +1389,13 @@ function rysujProfil() {
           </button>`).join('')}
       </div>
       <div class="okno-stopka">
+        ${profil ? '<button type="button" class="link" data-akcja="tylko-progi">Zmień tylko progi intensywności →</button>' : ''}
+        <span style="flex:1"></span>
         <button type="button" class="przycisk" data-akcja="pomin-profil">Pomiń – użyj ustawień domyślnych</button>
       </div>`;
     return;
   }
-  const styl = STYLE[krokProfilu.styl];
+  const styl = STYLE[krokProfilu.grupa];
   const wlasne = profil && profil.styl === 'wlasne' ? profil.punkty : punktyProfilu();
   el.innerHTML = `
     <h2>${styl.nazwa} – która tabelka pasuje do Ciebie?</h2>
@@ -1338,19 +1416,38 @@ function rysujProfil() {
 }
 
 function otworzProfil() {
-  krokProfilu = { styl: null };
+  krokProfilu = { grupa: null, styl: null, krok: 1, punkty: null };
   rysujProfil();
   if (!oknoProfil.open) oknoProfil.showModal();
 }
+/** Krok 2 → 3: zapamiętujemy wybrane godziny i pytamy o progi intensywności. */
 function zapiszProfil(styl, punkty) {
-  profil = { styl, punkty };
+  krokProfilu = { ...krokProfilu, styl, punkty, krok: 3 };
+  rysujProfil();
+}
+/** Krok 3: zapis całego profilu (godziny + progi). */
+function zapiszProgi(progi) {
+  const punkty = krokProfilu.punkty || punktyProfilu();
+  const styl = krokProfilu.punkty ? krokProfilu.styl : (profil ? profil.styl : 'domyslne');
+  profil = { styl, punkty, progi };
   zapiszLokalnie();
   oknoProfil.close();
   odswiez();
-  powiadom(`Zapisano Twój styl pracy: 1 dzień ≈ ${formatH(punkty[0])} h, 3 dni ≈ ${formatH(punkty[1])} h, 30 dni ≈ ${formatH(punkty[2])} h.`);
+  powiadom(`Zapisano: 1 dzień ≈ ${formatH(punkty[0])} h, 30 dni ≈ ${formatH(punkty[2])} h · luz od ${proc(progi.luz)}, krytycznie poniżej ${proc(progi.kryt)} potrzebnego czasu.`);
 }
 
 oknoProfil.addEventListener('submit', e => {
+  if (e.target.id === 'form-progi') {
+    e.preventDefault();
+    const f = new FormData(e.target);
+    const progi = { luz: parseFloat(f.get('luz')) / 100, kryt: parseFloat(f.get('kryt')) / 100 };
+    if (!poprawneProgi(progi)) {
+      document.getElementById('blad-progi').textContent = 'Próg luzu musi być większy od progu krytycznego, oba większe od zera.';
+      return;
+    }
+    zapiszProgi(progi);
+    return;
+  }
   if (e.target.id !== 'form-profil') return;
   e.preventDefault();
   const f = new FormData(e.target);
@@ -1362,7 +1459,7 @@ oknoProfil.addEventListener('submit', e => {
   zapiszProfil('wlasne', punkty);
 });
 // okna nie da się zamknąć klawiszem Esc przy pierwszym wejściu bez wyboru – wtedy liczymy jak "Pomiń"
-oknoProfil.addEventListener('cancel', () => { if (!profil) { profil = { styl: 'domyslne', punkty: DOMYSLNE_PUNKTY.slice() }; zapiszLokalnie(); } });
+oknoProfil.addEventListener('cancel', () => { if (!profil) { profil = { styl: 'domyslne', punkty: DOMYSLNE_PUNKTY.slice(), progi: { ...DOMYSLNE_PROGI } }; zapiszLokalnie(); odswiez(); } });
 
 /* ---------- Dymek z uwagami ("!") ----------
    Ustawiamy go względem ekranu (position: fixed), żeby nie przycinało go
@@ -1445,10 +1542,15 @@ document.addEventListener('click', e => {
     case 'anuluj': okno.close(); break;
     case 'zamknij-dzien': oknoDnia.close(); break;
     case 'profil': otworzProfil(); break;
-    case 'wybierz-styl': krokProfilu.styl = el.dataset.styl; rysujProfil(); break;
-    case 'wstecz-profil': krokProfilu.styl = null; rysujProfil(); break;
-    case 'wybierz-tabele': zapiszProfil(krokProfilu.styl, STYLE[krokProfilu.styl].tabele[Number(el.dataset.nr)].slice()); break;
-    case 'pomin-profil': zapiszProfil('domyslne', DOMYSLNE_PUNKTY.slice()); break;
+    case 'wybierz-styl': krokProfilu.grupa = el.dataset.styl; krokProfilu.krok = 2; rysujProfil(); break;
+    case 'wstecz-profil':
+      krokProfilu.krok = krokProfilu.krok === 3 && krokProfilu.grupa ? 2 : 1;
+      if (krokProfilu.krok === 1) krokProfilu = { grupa: null, styl: null, krok: 1, punkty: null };
+      rysujProfil(); break;
+    case 'tylko-progi': krokProfilu = { grupa: null, styl: null, krok: 3, punkty: null }; rysujProfil(); break;
+    case 'wybierz-progi': { const sz = SZABLONY_PROGOW[el.dataset.szablon]; zapiszProgi({ luz: sz.luz, kryt: sz.kryt }); break; }
+    case 'wybierz-tabele': zapiszProfil(krokProfilu.grupa, STYLE[krokProfilu.grupa].tabele[Number(el.dataset.nr)].slice()); break;
+    case 'pomin-profil': krokProfilu = { styl: 'domyslne', punkty: DOMYSLNE_PUNKTY.slice(), krok: 3 }; zapiszProgi({ ...DOMYSLNE_PROGI }); break;
     case 'przywroc-dzien': przywrocDni(el.dataset.data); break;
   }
 });

@@ -778,3 +778,6 @@ button.kropka-kal:hover { transform: scale(1.35); }
   .wlasne-pola { grid-template-columns: 1fr 1fr 1fr; }
   .wlasne-pola .przycisk { grid-column: 1 / -1; }
 }
+.tabela-progow td:first-child { display: flex; align-items: center; gap: 6px; }
+.tabela-progow .kropka-kal { cursor: default; }
+.progi-pola { grid-template-columns: 1fr 1fr auto; }
