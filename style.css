@@ -883,3 +883,16 @@ h1 { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
 
 /* przeliczona podpowiedź w polu dni/godzin – można ją nadpisać */
 .pole input.sugestia { color: var(--szary); font-style: italic; background: #fafaf9; }
+
+/* ----- Zaznaczenie wybranych opcji w panelu stylu pracy ----- */
+.styl-przycisk.wybrany, .tabela-profil.wybrany {
+  border: 2px solid var(--tusz);
+  padding: 13px;                       /* grubsza ramka bez przesuwania treści */
+  box-shadow: var(--cien);
+}
+.wlasne-profil.wybrany { border: 2px solid var(--tusz); border-radius: 12px; padding: 10px 12px; }
+.znacznik-wybrane {
+  display: inline-block; margin-left: 6px; padding: 1px 8px; border-radius: 999px;
+  background: var(--tusz); color: #fff; font-size: 11px; font-weight: 600; vertical-align: middle;
+}
+.obecny-profil { background: #f6f6f4; border-radius: 10px; padding: 10px 12px; font-size: 13px; line-height: 1.5; }

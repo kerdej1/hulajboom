@@ -1366,13 +1366,39 @@ function htmlSzablonuProgow(klucz, sz) {
   const wiersze = POZIOMY.map((p, i) => `<tr><td><i class="kropka-kal ${p.klucz}"></i> ${p.nazwa}</td>
     <td>${i < 4 ? '≥ ' + proc(pr[i]) : '< ' + proc(pr[3])}</td></tr>`).join('');
   return `
-    <button type="button" class="tabela-profil" data-akcja="wybierz-progi" data-szablon="${klucz}">
-      <span class="tabela-naglowek">${sz.nazwa}</span>
+    <button type="button" class="tabela-profil ${profil && wybranySzablonProgow() === klucz ? 'wybrany' : ''}" data-akcja="wybierz-progi" data-szablon="${klucz}">
+      <span class="tabela-naglowek">${sz.nazwa} ${znacznikWybrane(profil && wybranySzablonProgow() === klucz)}</span>
       <span class="maly-tekst">${sz.opis}</span>
       <table class="tabela-progow">${wiersze}</table>
       <span class="maly-tekst">Zadanie na 10 dni: luz, gdy do terminu ≥ ${dniPrzyklad(sz.luz)} dni; krytycznie poniżej ${dniPrzyklad(sz.kryt)} dni.</span>
     </button>`;
 }
+
+/* ---------- Co użytkownik ma teraz wybrane (do zaznaczenia obwódką) ---------- */
+function rowneLiczby(a, b) { return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 1e-9); }
+function wybranaGrupa() {
+  if (!profil) return null;
+  if (profil.grupa && STYLE[profil.grupa]) return profil.grupa;
+  if (STYLE[profil.styl]) return profil.styl;
+  return Object.keys(STYLE).find(k => STYLE[k].tabele.some(t => rowneLiczby(t, profil.punkty))) || null;
+}
+function wybranySzablonProgow() {
+  const p = progiUzytkownika();
+  return Object.keys(SZABLONY_PROGOW).find(k => Math.abs(SZABLONY_PROGOW[k].luz - p.luz) < 1e-9 && Math.abs(SZABLONY_PROGOW[k].kryt - p.kryt) < 1e-9) || null;
+}
+function opisObecnegoProfilu() {
+  if (!profil) return '';
+  const g = wybranaGrupa();
+  const pk = punktyProfilu();
+  const nrTabeli = g ? STYLE[g].tabele.findIndex(t => rowneLiczby(t, pk)) : -1;
+  const godziny = profil.styl === 'domyslne' && rowneLiczby(pk, DOMYSLNE_PUNKTY) ? 'ustawienia domyślne'
+    : `${g ? STYLE[g].nazwa : 'własne'}${nrTabeli >= 0 ? ` · wariant ${nrTabeli + 1}` : ' · własne liczby'}`;
+  const sz = wybranySzablonProgow();
+  const pr = progiUzytkownika();
+  return `<div class="obecny-profil"><b>Obecnie wybrane:</b> ${godziny} (1 dzień ≈ ${formatH(pk[0])} h, 3 dni ≈ ${formatH(pk[1])} h, 30 dni ≈ ${formatH(pk[2])} h)
+    · progi: ${sz ? SZABLONY_PROGOW[sz].nazwa : 'własne'} (luz od ${proc(pr.luz)}, krytycznie poniżej ${proc(pr.kryt)})</div>`;
+}
+function znacznikWybrane(tak) { return tak ? '<span class="znacznik-wybrane">✓ wybrane</span>' : ''; }
 
 const oknoProfil = document.getElementById('okno-profil');
 let krokProfilu = { grupa: null, styl: null, krok: 1, punkty: null };
@@ -1386,8 +1412,8 @@ function formatH(v) { return String(Math.round(v * 10) / 10).replace('.', ','); 
 function htmlTabeli(punkty, i) {
   const wiersze = PUNKTY_DNI.map((d, k) => `<tr><td>${d === 1 ? '1 dzień' : d + ' dni'}</td><td><b>${formatH(punkty[k])} h</b></td></tr>`).join('');
   return `
-    <button type="button" class="tabela-profil" data-akcja="wybierz-tabele" data-nr="${i}">
-      <span class="tabela-naglowek">Wariant ${i + 1}</span>
+    <button type="button" class="tabela-profil ${profil && rowneLiczby(punkty, punktyProfilu()) ? 'wybrany' : ''}" data-akcja="wybierz-tabele" data-nr="${i}">
+      <span class="tabela-naglowek">Wariant ${i + 1} ${znacznikWybrane(profil && rowneLiczby(punkty, punktyProfilu()))}</span>
       <table>${wiersze}</table>
       <span class="maly-tekst">np. 10 dni ≈ ${formatH(interpolujLog(10, PUNKTY_DNI, punkty))} h pracy</span>
     </button>`;
@@ -1402,8 +1428,8 @@ function rysujProfil() {
       <p class="maly-tekst">Intensywność zadania zależy od tego, jaka część potrzebnego czasu została do terminu.
         Każdy odczuwa to inaczej – wybierz, co do Ciebie pasuje.</p>
       <div class="tabele-profil">${Object.entries(SZABLONY_PROGOW).map(([k, sz]) => htmlSzablonuProgow(k, sz)).join('')}</div>
-      <details class="wlasne-profil">
-        <summary>Wpiszę własne progi</summary>
+      <details class="wlasne-profil ${profil && !wybranySzablonProgow() ? 'wybrany' : ''}" ${profil && !wybranySzablonProgow() ? 'open' : ''}>
+        <summary>Wpiszę własne progi ${znacznikWybrane(profil && !wybranySzablonProgow())}</summary>
         <form id="form-progi" class="wlasne-pola progi-pola">
           <label class="pole"><span>Luz od (% potrzebnego czasu)</span>
             <input name="luz" type="number" min="1" step="1" value="${Math.round(teraz.luz * 100)}"></label>
@@ -1428,10 +1454,11 @@ function rysujProfil() {
         musimy wiedzieć, jak lubisz pracować. Jaką pracę lubisz?</p>
       <div class="style-wybor">
         ${Object.entries(STYLE).map(([k, s]) => `
-          <button type="button" class="styl-przycisk" data-akcja="wybierz-styl" data-styl="${k}">
-            <b>${s.nazwa}</b><span class="maly-tekst">${s.opis}</span>
+          <button type="button" class="styl-przycisk ${wybranaGrupa() === k ? 'wybrany' : ''}" data-akcja="wybierz-styl" data-styl="${k}">
+            <b>${s.nazwa} ${znacznikWybrane(wybranaGrupa() === k)}</b><span class="maly-tekst">${s.opis}</span>
           </button>`).join('')}
       </div>
+      ${opisObecnegoProfilu()}
       <div class="okno-stopka">
         ${profil ? '<button type="button" class="link" data-akcja="tylko-progi">Zmień tylko progi intensywności →</button>' : ''}
         <span style="flex:1"></span>
@@ -1441,12 +1468,14 @@ function rysujProfil() {
   }
   const styl = STYLE[krokProfilu.grupa];
   const wlasne = profil && profil.styl === 'wlasne' ? profil.punkty : punktyProfilu();
+  // własne liczby zaznaczamy tylko w tej grupie, którą użytkownik wtedy wybrał
+  const czyWlasneGodziny = !!profil && profil.styl === 'wlasne' && wybranaGrupa() === krokProfilu.grupa;
   el.innerHTML = `
     <h2>${styl.nazwa} – która tabelka pasuje do Ciebie?</h2>
     <p class="maly-tekst">Ile godzin czystej pracy to dla Ciebie zadanie oszacowane na 1 dzień, 3 dni i 30 dni?</p>
     <div class="tabele-profil">${styl.tabele.map(htmlTabeli).join('')}</div>
-    <details class="wlasne-profil">
-      <summary>Żadna nie pasuje – wpiszę własne liczby</summary>
+    <details class="wlasne-profil ${czyWlasneGodziny ? 'wybrany' : ''}" ${czyWlasneGodziny ? 'open' : ''}>
+      <summary>Żadna nie pasuje – wpiszę własne liczby ${znacznikWybrane(czyWlasneGodziny)}</summary>
       <form id="form-profil" class="wlasne-pola">
         ${PUNKTY_DNI.map((d, k) => `<label class="pole"><span>${d === 1 ? '1 dzień' : d + ' dni'} = ile h?</span>
           <input name="p${k}" type="number" min="0.1" step="0.1" value="${formatH(wlasne[k]).replace(',', '.')}"></label>`).join('')}
@@ -1473,7 +1502,8 @@ function zapiszProfil(styl, punkty) {
 function zapiszProgi(progi) {
   const punkty = krokProfilu.punkty || punktyProfilu();
   const styl = krokProfilu.punkty ? krokProfilu.styl : (profil ? profil.styl : 'domyslne');
-  profil = { styl, punkty, progi };
+  const grupa = krokProfilu.punkty ? (krokProfilu.grupa || null) : (profil ? profil.grupa || null : null);
+  profil = { styl, punkty, progi, grupa };
   zapiszLokalnie();
   oknoProfil.close();
   odswiez();
