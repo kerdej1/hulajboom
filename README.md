@@ -137,6 +137,11 @@ Zaległe zadanie zostaje w dniu swojego terminu („⚠ nie zrobione w terminie�
 1. **Zadania okresowe, które naprawdę się powtarzają** – np. „co tydzień w poniedziałek i czwartek”; po odhaczeniu automatycznie tworzyłoby się kolejne. Teraz „okresowe” to tylko oznaczenie (bez priorytetu i planu).
 2. **Aplikacja ucząca się od użytkownika** – po każdej sesji pytanie „ile faktycznie pracowałeś?” i automatyczna korekta krzywej dni → godziny z ankiety stylu pracy. Szacunki stawałyby się z czasem coraz trafniejsze.
 3. **Dodawanie zadań zwykłym zdaniem** – np. „kolos z fizyki w piątek, ok. 3 dni nauki” → wypełniony formularz (prostym rozpoznawaniem słów albo z pomocą AI).
+4. **Zakładka „Projekty”** – obok Terminarza i Wszystkich zadań. Projekt to większy cel rozbity na mniejsze kroki (podzadania), np.:
+   - **Egzamin z matematyki dyskretnej** → research materiałów, nauka tematu 1, tematu 2, tematu 3, tematu 4… Projekt jest **połączony z terminarzem**: gdy według planu przychodzi czas na pracę nad egzaminem, sesja w terminarzu pokazuje, którym krokiem projektu się zająć, a odhaczenie kroku zmniejsza pozostałą pracę i wpływa na intensywność.
+   - **Wycieczka do Egiptu** → znaleźć mieszkanie, kupić bilety lotnicze, kupić klapki… Taki projekt może być **niezależny od terminarza** – to po prostu uporządkowana lista kroków z postępem (np. „3 z 7 zrobione”), bez planowania sesji.
+
+   Dzięki temu duże sprawy nie są jednym ogólnym zadaniem typu „ogarnąć egzamin”, tylko serią konkretnych kroków – łatwiej zacząć i widać postęp.
 
 ### Ograniczenia
 - **Postęp, dni wykreślone i styl pracy są zapisywane tylko w przeglądarce** (`localStorage`), a nie w pliku JSON – świadomie, żeby nie zmieniać formatu sprawdzanego przez jury. Na innym komputerze trzeba je ustawić od nowa. Czas pracy i rodzaje zadań są w pliku (ukryte tagi).
