@@ -319,7 +319,7 @@ function szacowanyCzas(z) {
   const dni = czasZTagu(z);
   if (dni !== null) return dni;
   const godz = godzinyZTagu(z);   // podano tylko godziny → dni wyliczamy z krzywej użytkownika
-  if (godz !== null) return Math.max(0.25, dniZGodzin(godz));
+  if (godz !== null) return Math.max(1, Math.ceil(dniZGodzin(godz)));   // z godzin → pełne dni (w górę)
   return DOMYSLNY_CZAS[z.priorytet] || 1;
 }
 /** Godziny czystej pracy wpisane ręcznie (ukryty tag "⏱12h"); null = liczone automatycznie. */
@@ -538,6 +538,8 @@ function planSesji(z) {
     if (H / n > MAX_SESJA_H) n = Math.ceil(H / MAX_SESJA_H);
   }
   n = Math.min(n, okno.length);            // najwyżej jedna sesja dziennie
+  // sesja nie krótsza niż ok. 1 h (przy nauce 30 min) – inaczej np. 10 h na 100 dni dałoby 42 sesje po 15 min
+  n = Math.min(n, Math.max(1, Math.floor(H / (czyNauka(z) ? 0.5 : 1))));
   const h = H / n;   // gdy wychodzi ponad 4 h – sesje się wydłużają, a opis planu ostrzega
 
   const dni = czyNauka(z) ? rozkladEbbinghausa(okno, n, doTerminu) : rozkladRowny(okno, n);
@@ -1082,12 +1084,10 @@ function zbierzFormularz() {
   if (typ === 'okresowe') tagi.push(TAG_OKRESOWE);
   else if (typ === 'akcja') tagi.push(TAG_AKCJA);
   else {
-    // pola dni i godzin są połączone – zapisujemy to, które użytkownik wpisał (drugie wynika z krzywej)
-    if (formularz.dataset.zrodlo === 'godziny') {
-      if (godziny > 0) tagi.push(`${ZNAK_CZASU}${Math.round(godziny * 10) / 10}h`);
-    } else if (czas > 0) {
-      tagi.push(tagCzasu(Math.round(czas * 10) / 10));
-    }
+    // zapisujemy tylko to, co użytkownik wpisał sam; przeliczona sugestia nie jest zapisywana
+    // (dzięki temu można wpisać np. 100 dni i tylko 10 godzin)
+    if (formularz.dataset.recznieDni === '1' && czas > 0) tagi.push(tagCzasu(Math.round(czas * 10) / 10));
+    if (formularz.dataset.recznieGodziny === '1' && godziny > 0) tagi.push(`${ZNAK_CZASU}${Math.round(godziny * 10) / 10}h`);
   }
   const poprzednie = edytowaneId !== null ? znajdz(edytowaneId) : null;
   return {
@@ -1112,15 +1112,30 @@ function ustawPolaOkresowe() {
 function zaokr(v) { return Math.round(v * 10) / 10; }
 
 /** Dni ↔ godziny: wpisanie jednego od razu przelicza drugie wg krzywej użytkownika. */
+/** Wpisuje sugestię do pola (wyróżnioną jako podpowiedź), chyba że użytkownik wpisał tam coś sam. */
+function ustawSugestie(pole, wartosc, recznie) {
+  if (recznie) return;
+  pole.value = wartosc;
+  pole.classList.toggle('sugestia', wartosc !== '');
+}
+/**
+ * Dni ↔ godziny: wpisanie jednego podpowiada drugie wg krzywej użytkownika
+ * (godziny → dni zaokrąglamy w górę do pełnych dni). To tylko sugestia –
+ * gdy wpiszesz oba pola sam, nic się nie nadpisuje (np. 100 dni i 10 h).
+ * Wyczyszczenie pola znowu włącza dla niego sugestię.
+ */
 function przeliczDniGodziny(e) {
   const nazwa = e && e.target && e.target.name;
-  const v = parseFloat(String(e && e.target ? e.target.value : '').replace(',', '.'));
+  if (nazwa !== 'czas' && nazwa !== 'godziny') return;
+  const v = parseFloat(String(e.target.value).replace(',', '.'));
+  const ds = formularz.dataset;
+  e.target.classList.remove('sugestia');
   if (nazwa === 'czas') {
-    formularz.dataset.zrodlo = 'dni';
-    formularz.godziny.value = v > 0 ? zaokr(godzinyZDni(v)) : '';
-  } else if (nazwa === 'godziny') {
-    formularz.dataset.zrodlo = 'godziny';
-    formularz.czas.value = v > 0 ? zaokr(dniZGodzin(v)) : '';
+    ds.recznieDni = v > 0 ? '1' : '';
+    ustawSugestie(formularz.godziny, v > 0 ? zaokr(godzinyZDni(v)) : '', ds.recznieGodziny === '1');
+  } else {
+    ds.recznieGodziny = v > 0 ? '1' : '';
+    ustawSugestie(formularz.czas, v > 0 ? Math.max(1, Math.ceil(dniZGodzin(v))) : '', ds.recznieDni === '1');
   }
 }
 
@@ -1131,7 +1146,7 @@ function pokazRekomendacjeGodzin() {
   formularz.czas.placeholder = `domyślnie ${String(dni).replace('.', ',')}`;
   formularz.godziny.placeholder = `domyślnie ${String(zaokr(godzinyZDni(dni))).replace('.', ',')}`;
   document.getElementById('rekomendacja-godzin').textContent =
-    'Pola są połączone: wpisz dni albo godziny – drugie przeliczy się samo wg Twojego stylu pracy.';
+    'Wpisz dni albo godziny – drugie pole podpowie się samo wg Twojego stylu pracy (szare = sugestia). Możesz też wpisać oba po swojemu, np. 100 dni i 10 h.';
 }
 
 function podgladPlanu() {
@@ -1180,9 +1195,14 @@ function otworzFormularz(id = null, domyslnyTermin = null) {
   // dni i godziny pokazujemy oba (jedno wpisane, drugie przeliczone)
   const godz = z ? godzinyZTagu(z) : null;
   const czas = z ? czasZTagu(z) : null;
-  formularz.dataset.zrodlo = godz !== null ? 'godziny' : 'dni';
-  formularz.czas.value = czas !== null ? czas : godz !== null ? zaokr(dniZGodzin(godz)) : '';
-  formularz.godziny.value = godz !== null ? godz : czas !== null ? zaokr(godzinyZDni(czas)) : '';
+  formularz.dataset.recznieDni = czas !== null ? '1' : '';
+  formularz.dataset.recznieGodziny = godz !== null ? '1' : '';
+  formularz.czas.classList.remove('sugestia');
+  formularz.godziny.classList.remove('sugestia');
+  formularz.czas.value = czas !== null ? czas : '';
+  formularz.godziny.value = godz !== null ? godz : '';
+  ustawSugestie(formularz.czas, godz !== null ? Math.max(1, Math.ceil(dniZGodzin(godz))) : '', czas !== null);
+  ustawSugestie(formularz.godziny, czas !== null ? zaokr(godzinyZDni(czas)) : '', godz !== null);
   const pri = z ? z.priorytet : 'sredni';
   formularz.querySelector(`input[name="priorytet"][value="${pri}"]`).checked = true;
   document.getElementById('blad-tytul').textContent = '';

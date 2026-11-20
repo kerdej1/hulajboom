@@ -880,3 +880,6 @@ h1 { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
 .ikona-akcja { font-size: .95em; }
 .rzad > .przelacznik-okres { grid-column: 1 / -1; }
 .przelacznik-okres .segmenty span { white-space: nowrap; }
+
+/* przeliczona podpowiedź w polu dni/godzin – można ją nadpisać */
+.pole input.sugestia { color: var(--szary); font-style: italic; background: #fafaf9; }
