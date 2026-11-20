@@ -868,3 +868,15 @@ h1 { font-size: 17px; font-weight: 650; letter-spacing: -0.01em; }
 .toast { border-radius: 12px; background: var(--tusz); }
 .toast button { color: #a5b4fc; }
 .link { color: var(--akcent); }
+
+/* ----- Pojedyncza akcja 🛴 ----- */
+.karta.p-akcja, .kafelek.p-akcja { border-left-color: var(--i-okresowe); background: #f6f6f4; }
+.kol-akcja .kol-nazwa::before { display: none; }
+.kropka-kal.akcja {
+  background: none; width: auto; height: auto; border-radius: 0;
+  font-size: 12px; line-height: 1; padding: 0;
+}
+.legenda .kropka-kal.akcja { margin-left: 6px; }
+.ikona-akcja { font-size: .95em; }
+.rzad > .przelacznik-okres { grid-column: 1 / -1; }
+.przelacznik-okres .segmenty span { white-space: nowrap; }

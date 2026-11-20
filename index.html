@@ -82,11 +82,15 @@
       </div>
 
       <div class="rzad">
-        <label class="pole przelacznik-okres">
-          <span>Rodzaj zadania</span>
-          <span class="checkbox-wiersz"><input name="okresowe" type="checkbox" value="tak"> ↻ Zadanie okresowe</span>
-          <small class="podpowiedz">Siłownia, zakupy, opłaty… – bez priorytetu i bez planowania.</small>
-        </label>
+        <fieldset class="pole przelacznik-okres">
+          <legend>Rodzaj zadania</legend>
+          <div class="segmenty">
+            <label><input type="radio" name="rodzaj" value="zwykle" checked><span>Zwykłe</span></label>
+            <label><input type="radio" name="rodzaj" value="okresowe"><span>↻ Okresowe</span></label>
+            <label><input type="radio" name="rodzaj" value="akcja"><span>🛴 Pojedyncza akcja</span></label>
+          </div>
+          <small class="podpowiedz">Okresowe (siłownia, zakupy) i pojedyncze akcje (np. zakup pralki) nie mają priorytetu ani czasu pracy.</small>
+        </fieldset>
       </div>
 
       <label class="pole">

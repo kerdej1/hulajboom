@@ -9,9 +9,10 @@
    Na tej podstawie aplikacja:
    - rozkłada dni pracy przed terminem (tyle, ile wynosi szacowany czas pracy),
    - pokazuje wszystko w terminarzu (tydzień / 2 tygodnie / miesiąc).
-   Zadania okresowe (siłownia, zakupy...) nie mają priorytetu ani dni pracy.
+   Zadania okresowe (siłownia, zakupy...) i pojedyncze akcje 🛴 (np. zakup pralki)
+   nie mają priorytetu ani dni pracy.
    Format pliku JSON pozostaje nietknięty – dodatkowe informacje (czas pracy,
-   zadanie okresowe) zapisujemy jako ukryte tagi, np. "⏱30d" i "okresowe".
+   zadanie okresowe, pojedyncza akcja) zapisujemy jako ukryte tagi, np. "⏱30d", "okresowe", "akcja".
    ===================================================================== */
 
 // ---------- Ustawienia ----------
@@ -40,9 +41,11 @@ const POZIOMY = [
 ];
 const NAZWA_POZIOMU = Object.fromEntries(POZIOMY.map(p => [p.klucz, p.nazwa]));
 NAZWA_POZIOMU.okresowe = 'Okresowe';
+NAZWA_POZIOMU.akcja = 'Pojedyncza akcja';
 
 // Ukryte tagi – tak zapisujemy w JSON informacje, dla których format nie ma pól
 const TAG_OKRESOWE = 'okresowe';         // zadanie okresowe (siłownia, zakupy...) – bez priorytetu
+const TAG_AKCJA = 'akcja';               // pojedyncza akcja (np. zakup pralki) – bez priorytetu i czasu, ikonka 🛴
 const ZNAK_CZASU = '⏱';                   // np. tag "⏱30d" = szacowany czas pracy 30 dni
 
 // ---------- Stan aplikacji ----------
@@ -280,7 +283,11 @@ function wczytajLokalnie() {
 
 /* ---------- Ukryte tagi ---------- */
 function czyOkresowe(z) { return z.tagi.includes(TAG_OKRESOWE); }
-function czyTagUkryty(t) { return t === TAG_OKRESOWE || t.startsWith(ZNAK_CZASU); }
+function czyAkcja(z) { return z.tagi.includes(TAG_AKCJA); }
+/** Zadania bez priorytetu i bez planowania: okresowe i pojedyncze akcje. */
+function czyBezPlanu(z) { return czyOkresowe(z) || czyAkcja(z); }
+function rodzaj(z) { return czyAkcja(z) ? 'akcja' : czyOkresowe(z) ? 'okresowe' : 'zwykle'; }
+function czyTagUkryty(t) { return t === TAG_OKRESOWE || t === TAG_AKCJA || t.startsWith(ZNAK_CZASU); }
 function widoczneTagi(z) { return z.tagi.filter(t => !czyTagUkryty(t)); }
 function czasZTagu(z) {
   for (const t of z.tagi) {
@@ -393,6 +400,7 @@ function wskaznikCzasu(z) {
 }
 /** Poziom intensywności: luz / spokojnie / pora / pilne / krytyczne (albo okresowe). */
 function poziom(z) {
+  if (czyAkcja(z)) return 'akcja';
   if (czyOkresowe(z)) return 'okresowe';
   const w = wskaznikCzasu(z);
   const progi = progiPoziomow();
@@ -502,7 +510,7 @@ function rozkladRowny(dostepne, n) {
  * Wykreślone dni są pomijane. Plan liczy się na nowo każdego dnia.
  */
 function planSesji(z) {
-  if (z.wykonane || !z.termin || czyOkresowe(z) || czyPowtorka(z)) return [];
+  if (z.wykonane || !z.termin || czyBezPlanu(z) || czyPowtorka(z)) return [];
   if (czyEgzamin(z) && powtorkiEgzaminu(z).length) return [];
   const H = godzinyPozostale(z);
   if (H < 0.05) return [];
@@ -573,7 +581,7 @@ function htmlUwag(uwagi) {
 /* ---------- Przewidywane zapamiętanie (krzywa Ebbinghausa) ---------- */
 /** Ile % materiału zostanie w pamięci w dniu terminu przy obecnym planie (null, gdy to nie nauka). */
 function przewidywaneZapamietanie(z) {
-  if (!z.termin || z.wykonane || czyOkresowe(z) || czyPowtorka(z)) return null;
+  if (!z.termin || z.wykonane || czyBezPlanu(z) || czyPowtorka(z)) return null;
   const doTerminu = roznicaDni(DZIS, z.termin);
   if (doTerminu < 0) return null;
   let dni;
@@ -690,6 +698,7 @@ function klasaKoloru(z) {
 }
 /** Znacznik przed tytułem: ↻ dla okresowych, !!! / !! / ! dla ważności. */
 function znacznikWaznosci(z) {
+  if (czyAkcja(z)) return '<span class="ikona-akcja" title="Pojedyncza akcja">🛴</span> ';
   if (czyOkresowe(z)) return '<span class="ikona-okres" title="Zadanie okresowe">↻</span> ';
   return `<span class="waga waga-${z.priorytet}" title="Ważność: ${NAZWA_PRIORYTETU[z.priorytet].toLowerCase()}">${ZNAK_WAZNOSCI[z.priorytet]}</span> `;
 }
@@ -730,11 +739,12 @@ function widokWszystkie() {
   const ileZrobionych = dane.zadania.filter(z => z.wykonane).length;
 
   const grupa = filtry.grupuj === 'waznosc' ? (z => z.priorytet) : poziom;
-  const zwykle = aktywne.filter(z => !czyOkresowe(z));
+  const zwykle = aktywne.filter(z => !czyBezPlanu(z));
   const kolumny = KOLUMNY[filtry.grupuj].map(k =>
     htmlKolumny(k.klucz, k.nazwa, k.opis || opisProgu(k.klucz), zwykle.filter(z => grupa(z) === k.klucz)));
   // zadania okresowe nie mają priorytetu ani poziomu – osobna, szara kolumna
-  kolumny.push(htmlKolumny('okresowe', 'Okresowe', 'siłownia, zakupy, opłaty… – bez priorytetu', aktywne.filter(czyOkresowe)));
+  kolumny.push(htmlKolumny('okresowe', 'Okresowe', 'siłownia, zakupy, opłaty… – bez priorytetu', aktywne.filter(z => rodzaj(z) === 'okresowe')));
+  kolumny.push(htmlKolumny('akcja', '🛴 Pojedyncze akcje', 'jednorazowe sprawy, np. zakup pralki', aktywne.filter(czyAkcja)));
   if (filtry.pokazZrobione) kolumny.push(htmlKolumny('zrobione', 'Zrobione', 'odhaczone zadania', zrobione));
 
   const pasek = `
@@ -772,12 +782,13 @@ function pokazSzczegoly(id) {
   if (!z) { if (oknoSzczegoly.open) oknoSzczegoly.close(); return; }
   szczegolyId = id;
   const p = poziom(z);
-  const okresowe = czyOkresowe(z);
+  const okresowe = czyBezPlanu(z);   // okresowe i pojedyncze akcje – bez priorytetu i planu
   const plan = planSesji(z);
   const zrobioneH = godzinyZrobione(z.id);
   let planHtml;
   const powtorki = czyEgzamin(z) ? powtorkiEgzaminu(z) : [];
   if (z.wykonane) planHtml = 'Zadanie zrobione.';
+  else if (czyAkcja(z)) planHtml = 'Pojedyncza akcja – bez rozpisanej pracy, po prostu ją załatw.';
   else if (okresowe) planHtml = 'Zadanie okresowe – bez rozpisanej pracy, po prostu zrób je w swoim dniu.';
   else if (czyPowtorka(z)) planHtml = `To powtórka przed egzaminem${czasPowtorkiH(z) ? ` (${opisDlugosciPowtorki(z)})` : ''} – sama jest sesją nauki.`;
   else if (powtorki.length) planHtml = `Powtórki: ${powtorki.filter(x => x.wykonane).length} z ${powtorki.length} zrobione · ` + powtorki.map(x => (x.wykonane ? '✓ ' : '') + ladnaData(x.termin)).join(' · ');
@@ -802,7 +813,7 @@ function pokazSzczegoly(id) {
     ${z.opis ? `<p class="szcz-opis">${esc(z.opis)}</p>` : '<p class="szcz-opis maly-tekst">Brak opisu.</p>'}
     <dl class="szcz-lista">
       <dt>Termin</dt><dd>${!z.termin ? 'bez terminu' : roznicaDni(DZIS, z.termin) > 1 ? esc(opisTerminu(z.termin)) : esc(ladnaData(z.termin)) + ' · ' + esc(opisTerminu(z.termin))}</dd>
-      <dt>Ważność</dt><dd>${okresowe ? '<span class="znaczek">↻ zadanie okresowe – bez priorytetu</span>' : `<span class="znaczek w-${z.priorytet}">${NAZWA_PRIORYTETU[z.priorytet]}</span>`}</dd>
+      <dt>Ważność</dt><dd>${okresowe ? `<span class="znaczek">${czyAkcja(z) ? '🛴 pojedyncza akcja' : '↻ zadanie okresowe'} – bez priorytetu</span>` : `<span class="znaczek w-${z.priorytet}">${NAZWA_PRIORYTETU[z.priorytet]}</span>`}</dd>
       <dt>Czas pracy</dt><dd>${czasHtml}</dd>
       <dt>Dni na pracę</dt><dd>${dniNaPraceHtml}</dd>
       ${przewidywaneZapamietanie(z) !== null ? `<dt>Zapamiętanie</dt><dd>${htmlZapamietania(przewidywaneZapamietanie(z))} <span class="maly-tekst">przewidywane z krzywej zapominania przy tym planie</span></dd>` : ''}
@@ -904,7 +915,7 @@ function htmlKropek(info) {
   const terminy = info.terminy.map(z => {
     const p = poziom(z);
     return `<button class="kropka-kal ${p}" data-akcja="szczegoly" data-id="${z.id}"
-      title="${esc(z.tytul)} (${NAZWA_POZIOMU[p].toLowerCase()})" aria-label="${esc(z.tytul)}"></button>`;
+      title="${esc(z.tytul)} (${NAZWA_POZIOMU[p].toLowerCase()})" aria-label="${esc(z.tytul)}">${p === 'akcja' ? '🛴' : ''}</button>`;
   }).join('');
   // 2. rząd: dni pracy – małe kółka, żeby nie zasłaniały terminów
   const praca = terminarz.pokazSesje ? info.sesje.map(s =>
@@ -987,9 +998,9 @@ function widokTerminarz() {
 
   const legenda = tryb === 'miesiac'
     ? `<span class="legenda">${POZIOMY.map(p => `<i class="kropka-kal ${p.klucz}"></i> ${p.nazwa.toLowerCase()}`).join(' ')}
-       <i class="kropka-kal okresowe"></i> okresowe
+       <i class="kropka-kal okresowe"></i> okresowe <span class="kropka-kal akcja">🛴</span> akcja
        ${terminarz.pokazSesje ? '<i class="kropka-kal sesja"></i> dzień pracy' : ''}</span> Kliknij kropkę lub kwadrat, aby zobaczyć zadanie, a puste miejsce w dniu – aby go wykreślić (np. wakacje).`
-    : 'Kolor paska = intensywność (zielony luz → fioletowy krytyczne, szary ↻ = okresowe), !!! / !! / ! = ważność. Kliknij zadanie, aby zobaczyć szczegóły, a kółko – aby je odhaczyć. Dni pracy są w przerywanej ramce. Kliknij puste miejsce w dniu, aby go wykreślić (np. wakacje) – plan się wtedy ściśnie.';
+    : 'Kolor paska = intensywność (zielony luz → fioletowy krytyczne, szary ↻ = okresowe, 🛴 = pojedyncza akcja), !!! / !! / ! = ważność. Kliknij zadanie, aby zobaczyć szczegóły, a kółko – aby je odhaczyć. Dni pracy są w przerywanej ramce. Kliknij puste miejsce w dniu, aby go wykreślić (np. wakacje) – plan się wtedy ściśnie.';
   const bezTerminu = dane.zadania.filter(z => !z.wykonane && !z.termin).length;
 
   return pasekNarzedzi + naglowkiDni +
@@ -1062,12 +1073,14 @@ const formularz = document.getElementById('formularz');
 
 function zbierzFormularz() {
   const f = new FormData(formularz);
-  const okresowe = f.get('okresowe') === 'tak';
+  const typ = f.get('rodzaj') || 'zwykle';
+  const okresowe = typ !== 'zwykle';   // okresowe i pojedyncze akcje nie mają priorytetu ani czasu pracy
   const czas = parseFloat(String(f.get('czas') || '').replace(',', '.'));
   // tagi widoczne dla użytkownika + ukryte: "okresowe" i "⏱Nd" (szacowany czas pracy)
   const tagi = (f.get('tagi') || '').split(',').map(t => t.trim().replace(/^#/, '')).filter(t => t && !czyTagUkryty(t));
   const godziny = parseFloat(String(f.get('godziny') || '').replace(',', '.'));
-  if (okresowe) tagi.push(TAG_OKRESOWE);
+  if (typ === 'okresowe') tagi.push(TAG_OKRESOWE);
+  else if (typ === 'akcja') tagi.push(TAG_AKCJA);
   else {
     // pola dni i godzin są połączone – zapisujemy to, które użytkownik wpisał (drugie wynika z krzywej)
     if (formularz.dataset.zrodlo === 'godziny') {
@@ -1081,7 +1094,7 @@ function zbierzFormularz() {
     tytul: (f.get('tytul') || '').trim(),
     opis: (f.get('opis') || '').trim(),
     termin: f.get('termin') || null,
-    // zadanie okresowe nie ma priorytetu, ale format JSON wymaga wartości – zostawiamy dotychczasową (albo "niski")
+    // okresowe / akcja nie mają priorytetu, ale format JSON wymaga wartości – zostawiamy dotychczasową (albo "niski")
     priorytet: okresowe ? (poprzednie ? poprzednie.priorytet : 'niski') : (f.get('priorytet') || 'sredni'),
     tagi: [...new Set(tagi)],
   };
@@ -1089,7 +1102,7 @@ function zbierzFormularz() {
 
 /** Okresowe zadanie nie ma ważności ani czasu pracy – chowamy te pola. */
 function ustawPolaOkresowe() {
-  const okresowe = formularz.okresowe.checked;
+  const okresowe = (formularz.querySelector('input[name="rodzaj"]:checked')?.value || 'zwykle') !== 'zwykle';
   document.getElementById('pole-waznosc').hidden = okresowe;
   document.getElementById('pole-czas').hidden = okresowe;
   document.getElementById('pole-godziny').hidden = okresowe;
@@ -1127,6 +1140,10 @@ function podgladPlanu() {
   const w = zbierzFormularz();
   const el = document.getElementById('podglad-planu');
   const proba = { id: edytowaneId ?? -1, ...w, wykonane: false };
+  if (czyAkcja(proba)) {
+    el.innerHTML = '🛴 Pojedyncza akcja: bez priorytetu i bez czasu pracy – w kalendarzu pokaże się z ikonką hulajnogi.';
+    return;
+  }
   if (czyOkresowe(proba)) {
     el.innerHTML = 'Zadanie okresowe: bez priorytetu i bez rozpisanej pracy – w kalendarzu pokaże się jako szary kwadrat.';
     return;
@@ -1159,7 +1176,7 @@ function otworzFormularz(id = null, domyslnyTermin = null) {
   formularz.opis.value = z ? z.opis : '';
   formularz.termin.value = z && z.termin ? z.termin : (domyslnyTermin || '');
   formularz.tagi.value = z ? widoczneTagi(z).join(', ') : '';
-  formularz.okresowe.checked = z ? czyOkresowe(z) : false;
+  formularz.querySelector(`input[name="rodzaj"][value="${z ? rodzaj(z) : 'zwykle'}"]`).checked = true;
   // dni i godziny pokazujemy oba (jedno wpisane, drugie przeliczone)
   const godz = z ? godzinyZTagu(z) : null;
   const czas = z ? czasZTagu(z) : null;
