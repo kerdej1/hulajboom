@@ -480,7 +480,7 @@ function planSesji(z) {
     if (H / n > MAX_SESJA_H) n = Math.ceil(H / MAX_SESJA_H);
   }
   n = Math.min(n, okno.length);            // najwyżej jedna sesja dziennie
-  const h = Math.min(MAX_DZIEN_H, H / n);   // dłużej niż 4 h dziennie nie ma sensu
+  const h = H / n;   // gdy wychodzi ponad 4 h – sesje się wydłużają, a opis planu ostrzega
 
   const dni = czyNauka(z) ? rozkladEbbinghausa(okno, n, doTerminu) : rozkladRowny(okno, n);
   const juz = zrobioneSesje(z.id).length;
@@ -503,8 +503,33 @@ function opisPlanu(z, plan) {
     ? godzinyRazem(z) / Math.max(NAUKA_MIN_SESJI, Math.ceil(godzinyRazem(z) / NAUKA_SESJA_H))
     : godzinyRazem(z) / Math.max(1, Math.round(szacowanyCzas(z) / ODSTEP_SPOKOJNY));
   if (plan[0].h > Math.max(hSpokojnie, SESJA_SPOKOJNA_H) * 1.1) tekst += ` <span class="tekst-pilne">· mniej czasu niż na spokojne tempo, więc sesje są dłuższe (spokojnie: ok. ${formatGodzin(hSpokojnie)})</span>`;
-  if (H - godz > 0.25) tekst += ` <span class="tekst-krytyczne">· przy rozsądnym limicie ${formatGodzin(MAX_DZIEN_H)} dziennie zabraknie ${formatGodzin(H - godz)}</span>`;
+  if (plan[0].h > MAX_DZIEN_H + 0.05) tekst += ` <span class="tekst-krytyczne">· ⚠ musisz wydłużyć sesje do ${formatGodzin(plan[0].h)} – to więcej niż zalecane ${formatGodzin(MAX_DZIEN_H)} dziennie (powyżej tego nauka daje coraz mniej)</span>`;
   return tekst;
+}
+
+/* ---------- Przewidywane zapamiętanie (krzywa Ebbinghausa) ---------- */
+/** Ile % materiału zostanie w pamięci w dniu terminu przy obecnym planie (null, gdy to nie nauka). */
+function przewidywaneZapamietanie(z) {
+  if (!z.termin || z.wykonane || czyOkresowe(z) || czyPowtorka(z)) return null;
+  const doTerminu = roznicaDni(DZIS, z.termin);
+  if (doTerminu < 0) return null;
+  let dni;
+  const powtorki = czyEgzamin(z) ? powtorkiEgzaminu(z) : [];
+  if (powtorki.length) {
+    // zrobione powtórki + te jeszcze przed nami (zaległe niezrobione się nie liczą)
+    dni = powtorki.filter(p => p.wykonane || p.termin >= DZIS).map(p => roznicaDni(DZIS, p.termin));
+  } else if (czyNauka(z)) {
+    dni = [...zrobioneSesje(z.id).map(d => roznicaDni(DZIS, d)), ...planSesji(z).map(s => roznicaDni(DZIS, s.data))];
+  } else {
+    return null;
+  }
+  if (!dni.length) return 0;
+  return Math.round(zapamietanie(dni.sort((a, b) => a - b), doTerminu) * 100);
+}
+function htmlZapamietania(proc, termin = 'w dniu terminu') {
+  if (proc === null) return '';
+  const klasa = proc >= 80 ? 'luz' : proc >= 60 ? 'spokojnie' : proc >= 40 ? 'pora' : 'pilne';
+  return `<span class="znaczek ${klasa}" title="Model krzywej zapominania Ebbinghausa: R = e^(−t/S)">🧠 ok. ${proc}% ${termin}</span>`;
 }
 
 function sesjaOdhaczona(id, data) {
@@ -712,6 +737,7 @@ function pokazSzczegoly(id) {
       <dt>Ważność</dt><dd>${okresowe ? '<span class="znaczek">↻ zadanie okresowe – bez priorytetu</span>' : `<span class="znaczek w-${z.priorytet}">${NAZWA_PRIORYTETU[z.priorytet]}</span>`}</dd>
       <dt>Czas pracy</dt><dd>${czasHtml}</dd>
       <dt>Dni na pracę</dt><dd>${dniNaPraceHtml}</dd>
+      ${przewidywaneZapamietanie(z) !== null ? `<dt>Zapamiętanie</dt><dd>${htmlZapamietania(przewidywaneZapamietanie(z))} <span class="maly-tekst">przewidywane z krzywej zapominania przy tym planie</span></dd>` : ''}
       <dt>Intensywność</dt><dd>${z.wykonane || okresowe ? '–' : `<span class="znaczek ${p}">${NAZWA_POZIOMU[p]}</span> <span class="maly-tekst">${esc(opisWskaznika(z))}</span>`}</dd>
       <dt>Tagi</dt><dd>${widoczneTagi(z).length ? widoczneTagi(z).map(t => `<span class="znaczek tag">#${esc(t)}</span>`).join(' ') : '–'}</dd>
       <dt>Status</dt><dd>${z.wykonane ? '✓ Zrobione' : 'Do zrobienia'}</dd>
@@ -1070,7 +1096,8 @@ function podgladEgzaminu() {
   el.innerHTML = `Do egzaminu: <b>${doEgz} dni</b>${wolneDni ? ` (w tym ${wolneDni} wykreślonych)` : ''}. ` +
     `<b>${ile} ${ile === 1 ? 'powtórka' : ile < 5 ? 'powtórki' : 'powtórek'} po ${formatJednej()}</b> (łącznie ${formatGodzin(ile * godzin)}), ` +
     `rozłożone wg krzywej zapominania: ` +
-    daty.map(d => `<span class="znaczek tag">${esc(d === DZIS ? 'dziś' : ladnaData(d))}</span>`).join(' ');
+    daty.map(d => `<span class="znaczek tag">${esc(d === DZIS ? 'dziś' : ladnaData(d))}</span>`).join(' ') +
+    `<br>Przewidywane zapamiętanie: ${htmlZapamietania(Math.round(zapamietanie([...new Set(daty)].map(d => roznicaDni(DZIS, d)), doEgz) * 100), 'w dniu egzaminu')}`;
 }
 
 function htmlEgzaminu(e) {
@@ -1094,6 +1121,7 @@ function htmlEgzaminu(e) {
         <div class="pasek"><div style="width:${proc}%"></div></div>
         <span class="maly-tekst">Powtórki: ${zrobione}/${powtorki.length}</span>
       </div>
+      <div>${htmlZapamietania(przewidywaneZapamietanie(e), 'w dniu egzaminu')}</div>
       <div class="powtorki">${chipy}</div>`;
   } else if (e.termin && doEgz >= 1) {
     dol = `<p class="maly-tekst">Ten egzamin nie ma jeszcze powtórek.</p>
@@ -1268,7 +1296,8 @@ function podgladPlanu() {
     el.innerHTML = naglowek + '<br>Brak sesji do zaplanowania przed terminem.';
     return;
   }
-  el.innerHTML = `${naglowek}<br>Plan: ${opisPlanu(proba, plan)}.`;
+  const pz = czyNauka(proba) ? przewidywaneZapamietanie(proba) : null;
+  el.innerHTML = `${naglowek}<br>Plan: ${opisPlanu(proba, plan)}.${pz !== null ? `<br>Przewidywane zapamiętanie: ${htmlZapamietania(pz)}` : ''}`;
 }
 
 function otworzFormularz(id = null, domyslnyTermin = null) {
