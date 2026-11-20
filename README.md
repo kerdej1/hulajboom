@@ -147,17 +147,7 @@ Zaległe zadanie zostaje w dniu swojego terminu („⚠ nie zrobione w terminie�
 
 ---
 
-## 5. Struktura plików
-
-| Plik | Co zawiera |
-|---|---|
-| `index.html` | struktura strony i okien (formularz, szczegóły, styl pracy, wykreślanie dni) |
-| `style.css` | wygląd |
-| `script.js` | cała logika: wczytywanie/zapis JSON, intensywność, plan sesji, krzywa zapominania, kalendarz |
-| `zadania.json` | przykładowe zadania |
-| `przyklad.js` | te same przykładowe zadania jako skrypt (żeby działało bez serwera) |
-
-## 6. Źródła
+## 5. Źródła
 
 - Ebbinghaus, H. (1885). *Über das Gedächtnis.*
 - Cepeda, N. J. i in. (2008). Spacing effects in learning: A temporal ridgeline of optimal retention. *Psychological Science.*
