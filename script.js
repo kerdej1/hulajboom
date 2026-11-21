@@ -91,16 +91,16 @@ function ladnaData(s, zDniem = true) {
   const opcje = zDniem ? { weekday: 'short', day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short' };
   return zISO(s).toLocaleDateString('pl-PL', opcje);
 }
-/** Lista dat dni pracy – długie plany skracamy, żeby nie zalały okna. */
-function listaDniPracy(plan, max = 8) {
-  const dni = plan.map(s => s.data === DZIS ? 'dziś' : ladnaData(s.data));
-  // kilka bloków w jednym dniu pokazujemy jako "pon., 23 lis ×2"
-  const zgrupowane = [];
-  for (const d of dni) {
-    const ost = zgrupowane[zgrupowane.length - 1];
-    if (ost && ost.d === d) ost.n++; else zgrupowane.push({ d, n: 1 });
-  }
-  const teksty = zgrupowane.map(x => x.n > 1 ? `${x.d} ×${x.n}` : x.d);
+/** Lista dni pracy – długie plany skracamy, żeby nie zalały okna.
+ *  Gdy sesje mają różną długość, przy każdym dniu małym drukiem jest jej czas. */
+function listaDniPracy(plan, max = 12) {
+  const rozne = new Set(plan.map(s => formatGodzin(s.h))).size > 1;
+  const teksty = plan.map(s => {
+    const dzien = s.data === DZIS ? 'dziś' : ladnaData(s.data);
+    return rozne
+      ? `<span class="dzien-planu" title="Sesja: ${formatGodzin(s.h)}">${dzien} <small class="godz-sesji">${formatGodzin(s.h)}</small></span>`
+      : dzien;
+  });
   return teksty.length > max ? teksty.slice(0, max).join(' · ') + ` · … (+${teksty.length - max} dni)` : teksty.join(' · ');
 }
 function formatDni(n) {
@@ -629,18 +629,17 @@ function planSesji(z) {
 function opisPlanu(z, plan) {
   const godz = plan.reduce((s, x) => s + x.h, 0);
   const nauka = czyNauka(z) ? ' · dni dobrane wg krzywej zapominania' : '';
-  const tekst = `${plan.length} ${plan.length === 1 ? 'sesja' : plan.length < 5 ? 'sesje' : 'sesji'} po ${zakresGodzin(plan)} (≈ ${formatGodzin(godz)} pracy)${nauka}: ${listaDniPracy(plan)}`;
+  const ile = `${plan.length} ${plan.length === 1 ? 'sesja' : plan.length < 5 ? 'sesje' : 'sesji'}`;
+  const rozne = new Set(plan.map(s => formatGodzin(s.h))).size > 1;
+  const tekst = rozne
+    ? `${ile}, razem ≈ ${formatGodzin(godz)} pracy${nauka} (czas sesji przy każdym dniu): ${listaDniPracy(plan)}`
+    : `${ile} po ${formatGodzin(plan[0].h)} (≈ ${formatGodzin(godz)} pracy)${nauka}: ${listaDniPracy(plan)}`;
   return tekst + htmlUwag(uwagiPlanu(z, plan));
 }
 
 /** Uwagi do planu (pokazywane po najechaniu na wykrzyknik). */
 function opisBrakuMiejsca(plan) {
   return `Brak wolnego czasu przed terminem: każdy dzień do terminu jest już wypełniony do limitu ${formatGodzin(plan.info.limit)} pracą przy ważniejszych lub pilniejszych zadaniach (brakuje ok. ${formatGodzin(plan.info.brakuje)}). Przesuń termin, zmniejsz zakres albo zwiększ limit w „⚙ Mój styl pracy”.`;
-}
-function zakresGodzin(plan) {
-  const hs = plan.map(s => s.h);
-  const a = formatGodzin(Math.min(...hs)), b = formatGodzin(Math.max(...hs));
-  return a === b ? a : `${a.replace(/ h$/, '')}–${b}`;
 }
 function uwagiPlanu(z, plan) {
   const uwagi = [];

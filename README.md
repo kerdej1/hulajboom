@@ -26,7 +26,7 @@ Lista zadań mówi, **co** trzeba zrobić. Student najczęściej nie wie, **kied
 Każdy z tych pomysłów to nasza koncepcja, a ich zasady opieramy na badaniach nad uczeniem się i pamięcią (źródła na końcu). Badania wyznaczają kierunek, a konkretne liczby w modelu to nasze uproszczenia – wyniki traktujemy więc jako dobrą wskazówkę, a nie pomiar.
 
 ### 3.1. Funkcja pracy dopasowana do każdego użytkownika
-Ten sam „3-dniowy” temat dla jednej osoby to 6 h nauki, dla innej 15 h. Dlatego przy pierwszym wejściu pytamy, **jaką pracę lubisz** (mało / średnio / bardzo intensywną), a potem prosimy o wybór tabelki: ile godzin czystej pracy to dla Ciebie zadanie na 1, 3 i 30 dni (albo własne liczby). Przez te punkty prowadzimy **indywidualną krzywą dni ↔ godziny** – każdy użytkownik dostaje własną funkcję, według której liczony jest jego plan. Pytamy też, **kiedy jest dla Ciebie luz, a kiedy krytycznie** (3 szablony albo własne progi). W formularzu dni i godziny podpowiadają się nawzajem wg tej funkcji, ale zawsze można wpisać własne wartości.
+Ten sam „3-dniowy” temat dla jednej osoby to 4 h nauki, dla innej 20 h. Dlatego przy pierwszym wejściu pytamy, **jaką pracę lubisz** (mało / średnio / bardzo intensywną), a potem prosimy o wybór tabelki: ile godzin czystej pracy to dla Ciebie zadanie na 1, 3 i 30 dni (albo własne liczby). W każdym stylu są 3 tabelki ułożone **od najlżejszej do najcięższej**, a style na siebie nie zachodzą (np. intensywna: od 3 / 7,5 / 37,5 h do 4 / 11 / 60 h). Przez te punkty prowadzimy **indywidualną krzywą dni ↔ godziny** – każdy użytkownik dostaje własną funkcję, według której liczony jest jego plan. Pytamy też, **kiedy jest dla Ciebie luz, a kiedy krytycznie** (3 szablony albo własne progi) i **ile najwięcej godzin dziennie możesz pracować** (domyślnie 12 h). W formularzu dni i godziny podpowiadają się nawzajem wg tej funkcji, ale zawsze można wpisać własne wartości.
 
 ### 3.2. Dwa priorytety: ważność i intensywność
 Pole `priorytet` to **ważność** (!!! / !! / !). Osobno liczymy **intensywność**, czyli jak bardzo goni czas:
@@ -41,7 +41,8 @@ Aplikacja rozkłada pracę na **sesje** w kalendarzu (np. „Nauka 2/4 · 2 h”
 - sesja nauki do ok. **2 h**, ponad **4 h dziennie** – ostrzeżenie (Ericsson, Krampe, Tesch-Römer),
 - najwyżej **jedna sesja dziennie** na zadanie – sen między sesjami utrwala wiedzę (Mazza i in.),
 - **rosnące przerwy** między sesjami (Cepeda i in.).
-- **limit godzin dziennie dla wszystkich zadań razem** (domyślnie 12 h, do ustawienia w „⚙ Mój styl pracy”) – gdy kilka zadań wypada naraz, czas dostają najpierw ważniejsze, a reszta przesuwa się na inne dni przed terminem; jeśli się nie mieści, „!” mówi, ilu godzin brakuje.
+
+**Plan wszystkich zadań naraz – dzienny limit.** Nawet ktoś, kto lubi intensywną pracę, nie przerobi kilku dni pod rząd po 18 h, gdy dwa przedmioty wypadną w tym samym czasie. Dlatego plan układamy wspólnie dla wszystkich zadań: w jednym dniu łącznie najwyżej tyle godzin, ile wynosi **limit** (domyślnie 12 h, do zmiany w „⚙ Mój styl pracy”). Czas dostają najpierw **ważniejsze** zadania (!!! → !! → !), przy tej samej ważności – te z bliższym terminem. Reszta przesuwa się na inne wolne dni przed swoim terminem, a gdy i tak się nie mieści, „!” mówi, ilu godzin brakuje. Pojedyncza sesja też nigdy nie przekracza limitu. Sesje jednego zadania mogą mieć wtedy różną długość, więc w planie przy **każdym dniu** jest małym drukiem jej czas (np. „dziś 45 min · wt., 24 lis 10 h”).
 
 ### 3.4. Krzywa zapominania Ebbinghausa – nasz sposób na „zakuwanie”
 Pamięć spada najszybciej zaraz po nauce, a każda powtórka spowalnia zapominanie (model **R = e^(−t/S)**). Wykorzystaliśmy to na dwa sposoby:
@@ -69,6 +70,7 @@ Wielu studentów wie, że zakuwanie nie działa, ale nie widzi, o ile – chciel
 **Ograniczenia:**
 - Odhaczone sesje, dni wykreślone i styl pracy są zapisywane **tylko w przeglądarce** (żeby nie zmieniać formatu JSON) – na innym komputerze trzeba je ustawić od nowa.
 - Parametry modelu (np. stabilność pamięci, progi 2 h / 4 h, tabelki stylów) to nasze uproszczenia – procent zapamiętania jest orientacyjny.
+- Przy dziennym limicie pierwszeństwo ma ważność, więc ważne zadanie z dalekim terminem może zająć dni, których potrzebuje mniej ważne, ale pilniejsze zadanie – aplikacja wtedy ostrzega „!”. Mądrzejsze rozdzielanie (ważne zadanie ustępuje najbliższe dni i bierze późniejsze) to pomysł na rozwój.
 - Gdy użytkownik sam wpisze czas pracy, w `tagi` pojawia się ukryty tag (`⏱…`) – format pozostaje poprawny.
 
 ## 5. Źródła

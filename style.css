@@ -1056,3 +1056,7 @@ body {
 .limit-wiersz { display: flex; align-items: center; gap: 8px; }
 .pole-limit .limit-wiersz input { width: 90px; flex: none; }
 .pole-limit .limit-wiersz { white-space: nowrap; }
+
+/* czas sesji przy dniu w planie (gdy sesje mają różną długość) */
+.dzien-planu { white-space: nowrap; }
+.godz-sesji { color: var(--szary); font-size: 0.8em; font-weight: 500; margin-left: 2px; }
