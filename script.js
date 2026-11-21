@@ -370,7 +370,11 @@ function dniZGodzin(h) { return h > 0 ? interpolujLog(h, punktyProfilu(), PUNKTY
 //   zapamiętanie → najwyżej jedna sesja dziennie na zadanie.
 const MAX_SESJA_H = 4;               // max na jedno zadanie w jednym dniu
 const MAX_DZIEN_H = 4;
-const MAX_SESJA_ABS_H = 12;          // fizyczny limit: dłuższej sesji w jednym dniu nie planujemy
+const DOMYSLNY_LIMIT_DNIA = 12;      // ile najwięcej godzin pracy dziennie – WSZYSTKIE zadania razem
+function limitDnia() {
+  const l = profil && Number(profil.limit);
+  return l >= 1 && l <= 16 ? l : DOMYSLNY_LIMIT_DNIA;
+}
 const NAUKA_SESJA_H = 2;             // przy nauce: sesje do ok. 2 h (powyżej korzyści maleją)
 const NAUKA_MIN_SESJI = 4;           // nauka + 3 powtórki
 const GODZIN_W_DNIU_POWTORKI = 6;    // "1 dzień" jako jednostka długości powtórki
@@ -510,19 +514,19 @@ function rozkladRowny(dostepne, n) {
  * Przy nauce dni wybiera krzywa zapominania, przy pozostałych zadaniach – równo.
  * Wykreślone dni są pomijane. Plan liczy się na nowo każdego dnia.
  */
-function planSesji(z) {
-  if (z.wykonane || !z.termin || czyBezPlanu(z) || czyPowtorka(z)) return [];
-  if (czyEgzamin(z) && powtorkiEgzaminu(z).length) return [];
+function planIdealny(z) {
+  if (z.wykonane || !z.termin || czyBezPlanu(z) || czyPowtorka(z)) return null;
+  if (czyEgzamin(z) && powtorkiEgzaminu(z).length) return null;
   const H = godzinyPozostale(z);
-  if (H < 0.05) return [];
+  if (H < 0.05) return null;
 
   const doTerminu = roznicaDni(DZIS, z.termin);
   const start = zrobioneSesje(z.id).includes(DZIS) ? 1 : 0;   // dziś już była sesja → od jutra
   const koniec = doTerminu - 1;
-  if (koniec < start) return [];
+  if (koniec < start) return null;
 
   const dostepne = dniRobocze(start, koniec);
-  if (!dostepne.length) return [];
+  if (!dostepne.length) return null;
   const juzSesji = zrobioneSesje(z.id).length;
   let okno, n;
   if (czyNauka(z)) {
@@ -541,42 +545,120 @@ function planSesji(z) {
   n = Math.min(n, okno.length);            // najwyżej jedna sesja dziennie
   // sesja nie krótsza niż ok. 1 h (przy nauce 30 min) – inaczej np. 10 h na 100 dni dałoby 42 sesje po 15 min
   n = Math.min(n, Math.max(1, Math.floor(H / (czyNauka(z) ? 0.5 : 1))));
-  // gdy wychodzi ponad 4 h – sesje się wydłużają (z ostrzeżeniem), ale nigdy ponad 12 h dziennie
-  const h = Math.min(MAX_SESJA_ABS_H, H / n);
-
+  // gdy wychodzi ponad 4 h – sesje się wydłużają (z ostrzeżeniem), ale nigdy ponad dzienny limit
+  const h = Math.min(limitDnia(), H / n);
   const dni = czyNauka(z) ? rozkladEbbinghausa(okno, n, doTerminu) : rozkladRowny(okno, n);
-  const juz = zrobioneSesje(z.id).length;
-  return dni.map((offset, i) => ({
-    data: dodajDni(DZIS, offset),
-    zadanie: z,
-    nr: juz + i + 1,
-    z: juz + dni.length,
-    h,
-  }));
+  return { H, h, dni, okno, dostepne };
+}
+
+/* ---------- Dzienny limit pracy dla WSZYSTKICH zadań razem ----------
+   Każde zadanie ma swój "idealny" plan (wyżej). Potem układamy je po kolei –
+   od najważniejszego (!!!), przy tej samej ważności od najbliższego terminu –
+   i każde zabiera tylko tyle godzin z danego dnia, ile jeszcze zostało do limitu.
+   Czego nie zmieści, przenosi na inne wolne dni przed swoim terminem:
+   najpierw na nieużyte dni w swoim oknie, potem na wcześniejsze dni,
+   a na końcu dokłada godziny do dni, w których już ma sesję. */
+const MIN_KAWALEK_H = 0.5;   // krótszych kawałków sesji nie tworzymy
+const KOLEJNOSC_WAZNOSCI = { wysoki: 0, sredni: 1, niski: 2 };
+
+function godzinyZrobioneDzis() {
+  let suma = 0;
+  for (const id of Object.keys(sesje)) for (const w of wpisySesji(id)) if (w.d === DZIS) suma += Number(w.h) || 0;
+  return suma;
+}
+
+function planWszystkich(zadania) {
+  const limit = limitDnia();
+  const zajete = new Map([[0, godzinyZrobioneDzis()]]);    // przesunięcie od dziś → godziny już rozdane
+  const wolneH = off => limit - (zajete.get(off) || 0);
+  const wynik = new Map();
+  const kolejka = zadania.map(z => ({ z, ideal: planIdealny(z) })).filter(x => x.ideal);
+  kolejka.sort((a, b) =>
+    (KOLEJNOSC_WAZNOSCI[a.z.priorytet] ?? 1) - (KOLEJNOSC_WAZNOSCI[b.z.priorytet] ?? 1)
+    || a.z.termin.localeCompare(b.z.termin) || a.z.id - b.z.id);
+
+  for (const { z, ideal } of kolejka) {
+    const przydzial = new Map();   // dzień → godziny tej sesji
+    const dodaj = (off, ile) => { przydzial.set(off, (przydzial.get(off) || 0) + ile); zajete.set(off, (zajete.get(off) || 0) + ile); };
+    let reszta = ideal.H;
+    // 1) dni z idealnego planu – tyle, ile się mieści
+    for (const off of ideal.dni) {
+      const ile = Math.min(ideal.h, reszta, wolneH(off));
+      if (ile >= MIN_KAWALEK_H - 1e-9 || (ile > 0.05 && ile >= reszta - 1e-9 && !przydzial.size)) { dodaj(off, ile); reszta -= ile; }
+    }
+    let przesuniete = reszta > MIN_KAWALEK_H;
+    // 2) nowe dni: najpierw nieużyte w oknie (od końca), potem wcześniejsze (od najbliższych)
+    if (reszta > 0.05) {
+      const wOknie = ideal.okno.filter(d => !przydzial.has(d)).reverse();
+      const wczesniej = ideal.dostepne.filter(d => d < ideal.okno[0]).reverse();
+      for (const off of [...wOknie, ...wczesniej]) {
+        if (reszta <= 0.05) break;
+        const ile = Math.min(Math.max(ideal.h, MIN_KAWALEK_H), reszta, wolneH(off));
+        if (ile >= MIN_KAWALEK_H - 1e-9 || (ile > 0.05 && ile >= reszta - 1e-9 && !przydzial.size)) { dodaj(off, ile); reszta -= ile; }
+      }
+    }
+    // 3) dalej brakuje → wydłużamy istniejące sesje (aż do limitu dnia)
+    if (reszta > 0.05) {
+      for (const off of [...przydzial.keys()].sort((a, b) => b - a)) {
+        if (reszta <= 0.05) break;
+        const ile = Math.min(reszta, wolneH(off));
+        if (ile > 0.05) { dodaj(off, ile); reszta -= ile; }
+      }
+    }
+    const dni = [...przydzial.keys()].sort((a, b) => a - b);
+    const juz = zrobioneSesje(z.id).length;
+    const plan = dni.map((off, i) => ({ data: dodajDni(DZIS, off), zadanie: z, nr: juz + i + 1, z: juz + dni.length, h: przydzial.get(off) }));
+    plan.info = { przesuniete, brakuje: Math.max(0, reszta), limit };
+    wynik.set(z, plan);
+  }
+  return wynik;
+}
+
+let pamiecPlanu = { klucz: null, wynik: null };
+function planSesji(z) {
+  const klucz = JSON.stringify([dane.zadania, sesje, wolne, profil, DZIS]);
+  if (pamiecPlanu.klucz !== klucz) pamiecPlanu = { klucz, wynik: planWszystkich(dane.zadania) };
+  if (pamiecPlanu.wynik.has(z)) return pamiecPlanu.wynik.get(z);
+  if (dane.zadania.includes(z)) return [];
+  // zadanie "na próbę" (podgląd w formularzu): układamy je razem z pozostałymi
+  const lista = dane.zadania.filter(x => x.id !== z.id).concat([z]);
+  return planWszystkich(lista).get(z) || [];
 }
 
 /** Krótki opis planu do szczegółów i podglądu w formularzu. */
 function opisPlanu(z, plan) {
   const godz = plan.reduce((s, x) => s + x.h, 0);
   const nauka = czyNauka(z) ? ' · dni dobrane wg krzywej zapominania' : '';
-  const tekst = `${plan.length} ${plan.length === 1 ? 'sesja' : plan.length < 5 ? 'sesje' : 'sesji'} po ${formatGodzin(plan[0].h)} (≈ ${formatGodzin(godz)} pracy)${nauka}: ${listaDniPracy(plan)}`;
+  const tekst = `${plan.length} ${plan.length === 1 ? 'sesja' : plan.length < 5 ? 'sesje' : 'sesji'} po ${zakresGodzin(plan)} (≈ ${formatGodzin(godz)} pracy)${nauka}: ${listaDniPracy(plan)}`;
   return tekst + htmlUwag(uwagiPlanu(z, plan));
 }
 
 /** Uwagi do planu (pokazywane po najechaniu na wykrzyknik). */
+function opisBrakuMiejsca(plan) {
+  return `Brak wolnego czasu przed terminem: każdy dzień do terminu jest już wypełniony do limitu ${formatGodzin(plan.info.limit)} pracą przy ważniejszych lub pilniejszych zadaniach (brakuje ok. ${formatGodzin(plan.info.brakuje)}). Przesuń termin, zmniejsz zakres albo zwiększ limit w „⚙ Mój styl pracy”.`;
+}
+function zakresGodzin(plan) {
+  const hs = plan.map(s => s.h);
+  const a = formatGodzin(Math.min(...hs)), b = formatGodzin(Math.max(...hs));
+  return a === b ? a : `${a.replace(/ h$/, '')}–${b}`;
+}
 function uwagiPlanu(z, plan) {
   const uwagi = [];
   if (!plan.length) return uwagi;
+  const najdluzsza = Math.max(...plan.map(s => s.h));
+  const info = plan.info || {};
   const hSpokojnie = czyNauka(z)
     ? godzinyRazem(z) / Math.max(NAUKA_MIN_SESJI, Math.ceil(godzinyRazem(z) / NAUKA_SESJA_H))
     : godzinyRazem(z) / Math.max(1, Math.round(szacowanyCzas(z) / ODSTEP_SPOKOJNY));
-  if (plan[0].h > Math.max(hSpokojnie, SESJA_SPOKOJNA_H) * 1.1)
+  if (najdluzsza > Math.max(hSpokojnie, SESJA_SPOKOJNA_H) * 1.1)
     uwagi.push(`Masz mniej czasu niż na spokojne tempo, więc sesje są dłuższe (spokojnie byłoby ok. ${formatGodzin(hSpokojnie)}).`);
-  if (plan[0].h > MAX_DZIEN_H + 0.05)
-    uwagi.push(`Musisz wydłużyć sesje do ${formatGodzin(plan[0].h)} – to więcej niż zalecane ${formatGodzin(MAX_DZIEN_H)} dziennie, powyżej tego nauka daje coraz mniej.`);
+  if (info.przesuniete)
+    uwagi.push(`W niektóre dni masz już dużo pracy przy ważniejszych lub pilniejszych zadaniach (limit ${formatGodzin(info.limit)} dziennie na wszystko), więc część sesji przesunęła się na inne dni.`);
+  if (najdluzsza > MAX_DZIEN_H + 0.05)
+    uwagi.push(`Musisz wydłużyć sesje do ${formatGodzin(najdluzsza)} – to więcej niż zalecane ${formatGodzin(MAX_DZIEN_H)} dziennie, powyżej tego nauka daje coraz mniej.`);
   const brakuje = godzinyPozostale(z) - plan.reduce((s, x) => s + x.h, 0);
   if (brakuje > 0.25)
-    uwagi.push(`Nawet przy ${formatGodzin(MAX_SESJA_ABS_H)} dziennie nie zmieścisz całej pracy – brakuje ok. ${formatGodzin(brakuje)}. Przesuń termin, zmniejsz zakres albo przywróć wykreślone dni.`);
+    uwagi.push(`Przy limicie ${formatGodzin(limitDnia())} dziennie (razem z innymi zadaniami) nie zmieścisz całej pracy – brakuje ok. ${formatGodzin(brakuje)}. Przesuń termin, zmniejsz zakres, przywróć wykreślone dni albo zwiększ limit w „⚙ Mój styl pracy”.`);
   return uwagi;
 }
 function htmlUwag(uwagi) {
@@ -841,7 +923,7 @@ function pokazSzczegoly(id) {
   else if (powtorki.length) planHtml = `Powtórki: ${powtorki.filter(x => x.wykonane).length} z ${powtorki.length} zrobione · ` + powtorki.map(x => (x.wykonane ? '✓ ' : '') + ladnaData(x.termin)).join(' · ');
   else if (!z.termin) planHtml = 'Bez terminu – nie da się zaplanować sesji. Zrób je w luźniejszy dzień.';
   else if (godzinyPozostale(z) < 0.05) planHtml = 'Cała zaplanowana praca zrobiona.';
-  else if (!plan.length) planHtml = 'Termin jest dziś lub minął – nie planujemy już sesji, czas działać.';
+  else if (!plan.length) planHtml = plan.info ? esc(opisBrakuMiejsca(plan)) : 'Termin jest dziś lub minął – nie planujemy już sesji, czas działać.';
   else planHtml = opisPlanu(z, plan);
   const doTerminu = z.termin ? roznicaDni(DZIS, z.termin) : null;
   const wykreslone = doTerminu > 0 ? doTerminu - dniNaPrace(z) : 0;
@@ -1239,7 +1321,7 @@ function podgladPlanu() {
   const plan = planSesji(proba);
   const naglowek = `Spokojnie: <b>${formatDni(szacowanyCzas(proba))}</b> (${godzinyZTagu(proba) !== null ? '' : '≈ '}${formatGodzin(godzinyRazem(proba))} pracy${godzinyZTagu(proba) !== null ? ', wpisane ręcznie' : ''}) · Intensywność: <b class="tekst-${p}">${NAZWA_POZIOMU[p]}</b> (${esc(opisWskaznika(proba))})`;
   if (!plan.length) {
-    el.innerHTML = naglowek + '<br>Brak sesji do zaplanowania przed terminem.';
+    el.innerHTML = naglowek + '<br>' + (plan.info ? esc(opisBrakuMiejsca(plan)) : 'Brak sesji do zaplanowania przed terminem.');
     return;
   }
   const pz = czyNauka(proba) ? przewidywaneZapamietanie(proba) : null;
@@ -1461,7 +1543,8 @@ function opisObecnegoProfilu() {
   const sz = wybranySzablonProgow();
   const pr = progiUzytkownika();
   return `<div class="obecny-profil"><b>Obecnie wybrane:</b> ${godziny} (1 dzień ≈ ${formatH(pk[0])} h, 3 dni ≈ ${formatH(pk[1])} h, 30 dni ≈ ${formatH(pk[2])} h)
-    · progi: ${sz ? SZABLONY_PROGOW[sz].nazwa : 'własne'} (luz od ${proc(pr.luz)}, krytycznie poniżej ${proc(pr.kryt)})</div>`;
+    · progi: ${sz ? SZABLONY_PROGOW[sz].nazwa : 'własne'} (luz od ${proc(pr.luz)}, krytycznie poniżej ${proc(pr.kryt)})
+    · najwyżej ${formatH(limitDnia())} h pracy dziennie</div>`;
 }
 function znacznikWybrane(tak) { return tak ? '<span class="znacznik-wybrane">✓ wybrane</span>' : ''; }
 
@@ -1505,6 +1588,9 @@ function rysujProfil() {
           <small class="blad" id="blad-progi"></small>
         </form>
       </details>
+      <label class="pole pole-limit"><span>Ile najwięcej godzin dziennie możesz pracować – wszystkie zadania razem?</span>
+        <span class="limit-wiersz"><input id="pole-limit" type="number" min="1" max="16" step="0.5" value="${formatH(limitDnia()).replace(',', '.')}"> h dziennie</span>
+        <small class="podpowiedz">Gdy kilka zadań wypada naraz, plan nie przekroczy tego limitu – ważniejsze zadania dostają czas pierwsze, reszta przesuwa się na inne dni. Zapisuje się po wybraniu progów powyżej.</small></label>
       <div class="okno-stopka">
         <button type="button" class="przycisk" data-akcja="wstecz-profil">← Wstecz</button>
         <span style="flex:1"></span>
@@ -1568,11 +1654,14 @@ function zapiszProgi(progi) {
   const punkty = krokProfilu.punkty || punktyProfilu();
   const styl = krokProfilu.punkty ? krokProfilu.styl : (profil ? profil.styl : 'domyslne');
   const grupa = krokProfilu.punkty ? (krokProfilu.grupa || null) : (profil ? profil.grupa || null : null);
-  profil = { styl, punkty, progi, grupa };
+  const pole = document.getElementById('pole-limit');
+  const wpisany = pole ? parseFloat(String(pole.value).replace(',', '.')) : NaN;
+  const limit = wpisany >= 1 && wpisany <= 16 ? wpisany : limitDnia();
+  profil = { styl, punkty, progi, grupa, limit };
   zapiszLokalnie();
   oknoProfil.close();
   odswiez();
-  powiadom(`Zapisano: 1 dzień ≈ ${formatH(punkty[0])} h, 30 dni ≈ ${formatH(punkty[2])} h · luz od ${proc(progi.luz)}, krytycznie poniżej ${proc(progi.kryt)} potrzebnego czasu.`);
+  powiadom(`Zapisano: 1 dzień ≈ ${formatH(punkty[0])} h, 30 dni ≈ ${formatH(punkty[2])} h · luz od ${proc(progi.luz)}, krytycznie poniżej ${proc(progi.kryt)} potrzebnego czasu · najwyżej ${formatH(limit)} h pracy dziennie.`);
 }
 
 oknoProfil.addEventListener('submit', e => {

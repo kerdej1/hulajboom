@@ -41,6 +41,7 @@ Aplikacja rozkłada pracę na **sesje** w kalendarzu (np. „Nauka 2/4 · 2 h”
 - sesja nauki do ok. **2 h**, ponad **4 h dziennie** – ostrzeżenie (Ericsson, Krampe, Tesch-Römer),
 - najwyżej **jedna sesja dziennie** na zadanie – sen między sesjami utrwala wiedzę (Mazza i in.),
 - **rosnące przerwy** między sesjami (Cepeda i in.).
+- **limit godzin dziennie dla wszystkich zadań razem** (domyślnie 12 h, do ustawienia w „⚙ Mój styl pracy”) – gdy kilka zadań wypada naraz, czas dostają najpierw ważniejsze, a reszta przesuwa się na inne dni przed terminem; jeśli się nie mieści, „!” mówi, ilu godzin brakuje.
 
 ### 3.4. Krzywa zapominania Ebbinghausa – nasz sposób na „zakuwanie”
 Pamięć spada najszybciej zaraz po nauce, a każda powtórka spowalnia zapominanie (model **R = e^(−t/S)**). Wykorzystaliśmy to na dwa sposoby:

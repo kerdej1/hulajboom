@@ -1049,3 +1049,10 @@ body {
 .kropka-kal.zalegla-kopia { opacity: .45; outline: 1.5px dashed currentColor; outline-offset: 1px; }
 .dzien-kal.przeszly .karta { opacity: .9; }
 .karta .znaczek { white-space: normal; line-height: 1.35; padding: 1px 6px; }
+
+/* limit godzin dziennie w panelu "Mój styl pracy" */
+.pole-limit { display: grid; gap: 6px; margin-top: 16px; }
+.pole-limit > span:first-child { font-weight: 600; }
+.limit-wiersz { display: flex; align-items: center; gap: 8px; }
+.pole-limit .limit-wiersz input { width: 90px; flex: none; }
+.pole-limit .limit-wiersz { white-space: nowrap; }
