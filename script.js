@@ -343,7 +343,7 @@ function godzinyZTagu(z) {
 const SESJA_SPOKOJNA_H = 3;          // długość sesji przy spokojnym tempie
 const ODSTEP_SPOKOJNY = 2.4;         // co ile dni sesja przy spokojnym tempie
 const PUNKTY_DNI = [1, 3, 30];
-const DOMYSLNE_PUNKTY = [3.5, 7.5, 37.5];   // zanim użytkownik wybierze swój styl
+const DOMYSLNE_PUNKTY = [3, 7.5, 37.5];      // zanim użytkownik wybierze swój styl
 let profil = null;                           // { styl, punkty: [h1, h3, h30] }
 
 function punktyProfilu() {
@@ -370,6 +370,7 @@ function dniZGodzin(h) { return h > 0 ? interpolujLog(h, punktyProfilu(), PUNKTY
 //   zapamiętanie → najwyżej jedna sesja dziennie na zadanie.
 const MAX_SESJA_H = 4;               // max na jedno zadanie w jednym dniu
 const MAX_DZIEN_H = 4;
+const MAX_SESJA_ABS_H = 12;          // fizyczny limit: dłuższej sesji w jednym dniu nie planujemy
 const NAUKA_SESJA_H = 2;             // przy nauce: sesje do ok. 2 h (powyżej korzyści maleją)
 const NAUKA_MIN_SESJI = 4;           // nauka + 3 powtórki
 const GODZIN_W_DNIU_POWTORKI = 6;    // "1 dzień" jako jednostka długości powtórki
@@ -540,7 +541,8 @@ function planSesji(z) {
   n = Math.min(n, okno.length);            // najwyżej jedna sesja dziennie
   // sesja nie krótsza niż ok. 1 h (przy nauce 30 min) – inaczej np. 10 h na 100 dni dałoby 42 sesje po 15 min
   n = Math.min(n, Math.max(1, Math.floor(H / (czyNauka(z) ? 0.5 : 1))));
-  const h = H / n;   // gdy wychodzi ponad 4 h – sesje się wydłużają, a opis planu ostrzega
+  // gdy wychodzi ponad 4 h – sesje się wydłużają (z ostrzeżeniem), ale nigdy ponad 12 h dziennie
+  const h = Math.min(MAX_SESJA_ABS_H, H / n);
 
   const dni = czyNauka(z) ? rozkladEbbinghausa(okno, n, doTerminu) : rozkladRowny(okno, n);
   const juz = zrobioneSesje(z.id).length;
@@ -572,6 +574,9 @@ function uwagiPlanu(z, plan) {
     uwagi.push(`Masz mniej czasu niż na spokojne tempo, więc sesje są dłuższe (spokojnie byłoby ok. ${formatGodzin(hSpokojnie)}).`);
   if (plan[0].h > MAX_DZIEN_H + 0.05)
     uwagi.push(`Musisz wydłużyć sesje do ${formatGodzin(plan[0].h)} – to więcej niż zalecane ${formatGodzin(MAX_DZIEN_H)} dziennie, powyżej tego nauka daje coraz mniej.`);
+  const brakuje = godzinyPozostale(z) - plan.reduce((s, x) => s + x.h, 0);
+  if (brakuje > 0.25)
+    uwagi.push(`Nawet przy ${formatGodzin(MAX_SESJA_ABS_H)} dziennie nie zmieścisz całej pracy – brakuje ok. ${formatGodzin(brakuje)}. Przesuń termin, zmniejsz zakres albo przywróć wykreślone dni.`);
   return uwagi;
 }
 function htmlUwag(uwagi) {
@@ -1366,21 +1371,25 @@ function przywrocDni(data) {
    2) Wybierz tabelkę, która najlepiej do Ciebie pasuje (albo wpisz własne liczby).
    Z wybranych punktów aplikacja buduje swoją funkcję "dni → godziny pracy".
    ===================================================================== */
+// Tabelki: godziny czystej pracy dla zadania na 1 / 3 / 30 dni.
+// Warianty są ułożone od najlżejszego do najcięższego (każda liczba rośnie z wariantem),
+// a style na siebie nie zachodzą: najcięższy wariant "mało intensywnej" < najlżejszy "intensywnej" itd.
+// W każdej tabelce na dłuższe zadania przypada mniej godzin dziennie (np. 3 h/dzień → 1,25 h/dzień).
 const STYLE = {
   malo: {
     nazwa: 'Mało intensywna',
     opis: 'Wolę pracować po trochu, bez długich posiedzeń.',
-    tabele: [[1.5, 4, 20], [2, 5, 25], [2, 6, 30]],
+    tabele: [[1.5, 4, 20], [2, 5, 25], [2.5, 6, 30]],
   },
   intensywna: {
     nazwa: 'Intensywna',
     opis: 'Lubię porządnie usiąść do pracy, ale z rozsądkiem.',
-    tabele: [[3.5, 7.5, 37.5], [2, 10, 40], [4, 15, 100]],
+    tabele: [[3, 7.5, 37.5], [3.5, 9, 45], [4, 11, 60]],
   },
   bardzo: {
     nazwa: 'Bardzo intensywna',
     opis: 'Najlepiej idzie mi, gdy pracuję dużo i długo.',
-    tabele: [[4, 16, 110], [5, 18, 130], [6, 22, 160]],
+    tabele: [[5, 13, 80], [6, 16, 100], [7, 20, 130]],
   },
 };
 /* ---------- Progi intensywności (kiedy luz, a kiedy krytycznie) ----------
@@ -1528,7 +1537,7 @@ function rysujProfil() {
   const czyWlasneGodziny = !!profil && profil.styl === 'wlasne' && wybranaGrupa() === krokProfilu.grupa;
   el.innerHTML = `
     <h2>${styl.nazwa} – która tabelka pasuje do Ciebie?</h2>
-    <p class="maly-tekst">Ile godzin czystej pracy to dla Ciebie zadanie oszacowane na 1 dzień, 3 dni i 30 dni?</p>
+    <p class="maly-tekst">Ile godzin czystej pracy to dla Ciebie zadanie oszacowane na 1 dzień, 3 dni i 30 dni? Warianty są ułożone od najlżejszego do najcięższego.</p>
     <div class="tabele-profil">${styl.tabele.map(htmlTabeli).join('')}</div>
     <details class="wlasne-profil ${czyWlasneGodziny ? 'wybrany' : ''}" ${czyWlasneGodziny ? 'open' : ''}>
       <summary>Żadna nie pasuje – wpiszę własne liczby ${znacznikWybrane(czyWlasneGodziny)}</summary>
